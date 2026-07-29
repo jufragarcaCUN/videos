@@ -99,7 +99,7 @@ def render_sidebar_filters(df):
     filters_sidebar = {}
 
     for col, label in [
-        ("area", "📚 Área"),
+        ("area", "📚 Programa"),
         ("nombres_apellidos", "👨‍🏫 Docente"),
         ("nom_materia", "📖 Materia"),
     ]:

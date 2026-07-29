@@ -167,7 +167,7 @@ def mostrar_interpretacion_grafica(titulo, que_muestra, como_leer, que_buscar):
 
 
 def mostrar_tabla_metricas():
-    """Muestra la tabla de métricas con sus definiciones y rangos"""
+    """Muestra la tabla de métricas con definiciones, cómo se miden y rangos"""
 
     st.markdown("### 📋 Diccionario de Métricas")
     st.markdown(
@@ -182,39 +182,120 @@ def mostrar_tabla_metricas():
         unsafe_allow_html=True,
     )
 
-    data = []
-    for key, config in METRICAS_CONFIG.items():
-        limite = config["limite_cumple"]
-        condicion = config["condicion"]
+    data = [
+        {
+            "Métrica": "Cortes o interrupciones",
+            "Columna": "CPM",
+            "¿Qué mide?": "Número de cortes o interrupciones en el audio por minuto. Mide la fluidez del discurso del docente.",
+            "¿Cómo se mide?": "Se cuentan los cortes en el audio y se dividen por la duración total en minutos.",
+            "Unidad": "cortes/min",
+            "✅ Buena": "> 18.0",
+            "⚠️ Regular": "12.60 - 18.0",
+            "❌ Mala": "< 12.60",
+        },
+        {
+            "Métrica": "Duración del monólogo",
+            "Columna": "DME_s",
+            "¿Qué mide?": "Tiempo promedio que el docente habla sin interrupción. Mide la capacidad de mantener la atención del estudiante.",
+            "¿Cómo se mide?": "Se calcula el promedio de los segmentos de habla continua del docente.",
+            "Unidad": "segundos",
+            "✅ Buena": "< 3.5",
+            "⚠️ Regular": "3.5 - 4.55",
+            "❌ Mala": "> 4.55",
+        },
+        {
+            "Métrica": "Porcentaje de habla",
+            "Columna": "DTE_ratio",
+            "¿Qué mide?": "Relación entre el tiempo que habla el docente y el tiempo total de la grabación.",
+            "¿Cómo se mide?": "Tiempo hablado por el docente / duración total de la grabación.",
+            "Unidad": "adimensional",
+            "✅ Buena": "≤ 0.5",
+            "⚠️ Regular": "0.5 - 0.65",
+            "❌ Mala": "> 0.65",
+        },
+        {
+            "Métrica": "Estabilidad técnica",
+            "Columna": "Jitter_Score",
+            "¿Qué mide?": "Estabilidad de la voz del docente. Mide fluidez y naturalidad del discurso.",
+            "¿Cómo se mide?": "Variación de la frecuencia fundamental de la voz. Valores más altos = mayor estabilidad.",
+            "Unidad": "adimensional",
+            "✅ Buena": "> 0.4",
+            "⚠️ Regular": "0.28 - 0.4",
+            "❌ Mala": "< 0.28",
+        },
+        {
+            "Métrica": "Movimiento promedio",
+            "Columna": "IMP_promedio",
+            "¿Qué mide?": "Cantidad de movimiento corporal del docente. Mide dinamismo y energía en la clase.",
+            "¿Cómo se mide?": "Se calcula el promedio de movimiento del docente a través de la grabación.",
+            "Unidad": "adimensional",
+            "✅ Buena": "> 4.0",
+            "⚠️ Regular": "2.80 - 4.0",
+            "❌ Mala": "< 2.80",
+        },
+        {
+            "Métrica": "Cambios de movimiento",
+            "Columna": "sigma2_IM",
+            "¿Qué mide?": "Variación en el movimiento corporal. Mide consistencia y ritmo del docente.",
+            "¿Cómo se mide?": "Desviación estándar del movimiento a lo largo de la grabación.",
+            "Unidad": "adimensional",
+            "✅ Buena": "> 8.5",
+            "⚠️ Regular": "5.95 - 8.5",
+            "❌ Mala": "< 5.95",
+        },
+        {
+            "Métrica": "Variación de la voz",
+            "Columna": "Tone_CoV",
+            "¿Qué mide?": "Variación del tono de voz del docente. Mide expresividad y capacidad de mantener el interés.",
+            "¿Cómo se mide?": "Coeficiente de variación del tono a lo largo de la grabación.",
+            "Unidad": "adimensional",
+            "✅ Buena": "> 0.32",
+            "⚠️ Regular": "0.22 - 0.32",
+            "❌ Mala": "< 0.22",
+        },
+        {
+            "Métrica": "Nivel de energía",
+            "Columna": "Enthusiasm_Score",
+            "¿Qué mide?": "Nivel de entusiasmo y energía del docente. Mide engagement con los estudiantes.",
+            "¿Cómo se mide?": "Algoritmo de análisis de audio que detecta patrones de entusiasmo en la voz.",
+            "Unidad": "adimensional",
+            "✅ Buena": "> 0.15",
+            "⚠️ Regular": "0.10 - 0.15",
+            "❌ Mala": "< 0.10",
+        },
+        {
+            "Métrica": "Certeza",
+            "Columna": "Porcentaje_Certeza",
+            "¿Qué mide?": "Confianza en la clasificación de la grabación. Mide claridad en la transmisión del contenido.",
+            "¿Cómo se mide?": "Porcentaje de certeza del modelo de clasificación al evaluar la grabación.",
+            "Unidad": "%",
+            "✅ Buena": "> 50",
+            "⚠️ Regular": "35.00 - 50",
+            "❌ Mala": "< 35.00",
+        },
+    ]
 
-        if condicion == "mayor":
-            buena = f"> {limite}"
-            regular = f"{limite*0.7:.2f} - {limite}"
-            mala = f"< {limite*0.7:.2f}"
-        elif condicion == "menor":
-            buena = f"< {limite}"
-            regular = f"{limite} - {limite*1.3:.2f}"
-            mala = f"> {limite*1.3:.2f}"
-        elif condicion == "menor_igual":
-            buena = f"≤ {limite}"
-            regular = f"{limite} - {limite*1.3:.2f}"
-            mala = f"> {limite*1.3:.2f}"
-        else:
-            buena = "N/A"
-            regular = "N/A"
-            mala = "N/A"
+    df_metricas = pd.DataFrame(data)
 
-        data.append(
-            {
-                "Métrica": config["nombre"],
-                "Columna": key,
-                "Unidad": config["unidad"] if config["unidad"] else "adimensional",
-                "✅ Buena": buena,
-                "⚠️ Regular": regular,
-                "❌ Mala": mala,
-            }
-        )
+    st.dataframe(
+        df_metricas,
+        column_config={
+            "Métrica": st.column_config.TextColumn("Métrica", width="medium"),
+            "Columna": st.column_config.TextColumn("Columna", width="small"),
+            "¿Qué mide?": st.column_config.TextColumn("¿Qué mide?", width="large"),
+            "¿Cómo se mide?": st.column_config.TextColumn(
+                "¿Cómo se mide?", width="large"
+            ),
+            "Unidad": st.column_config.TextColumn("Unidad", width="small"),
+            "✅ Buena": st.column_config.TextColumn("✅ Buena", width="small"),
+            "⚠️ Regular": st.column_config.TextColumn("⚠️ Regular", width="small"),
+            "❌ Mala": st.column_config.TextColumn("❌ Mala", width="small"),
+        },
+        hide_index=True,
+        use_container_width=True,
+    )
 
+    st.markdown("---")
     df_metricas = pd.DataFrame(data)
 
     st.dataframe(
@@ -265,7 +346,7 @@ def main():
         )
     with col3:
         st.metric(
-            "Total Áreas",
+            "Total Programas",
             df_filtrado["area"].nunique() if "area" in df_filtrado.columns else 0,
         )
     with col4:
@@ -355,15 +436,15 @@ def main():
                     )
 
     # ================================================================
-    # GRÁFICA 2: Mapa de Calor - Desempeño Docente por Área
+    # GRÁFICA 2: Mapa de Calor - Desempeño Docente por Programa
     # ================================================================
     with st.expander(
-        "🔥 Gráfica 2: Mapa de Calor - Desempeño Docente por Área", expanded=False
+        "🔥 Gráfica 2: Mapa de Calor - Desempeño Docente por Programa", expanded=False
     ):
         mostrar_leyenda_grafica(
-            "Desempeño Docente por Área",
-            "¿Cómo se desempeña cada docente en su área? ¿Qué áreas y docentes destacan?",
-            "🔹 Cada fila = un docente.\n🔹 Cada columna = un área.\n🔹 El color indica el desempeño (métrica seleccionada).\n🔹 Verde = alto desempeño, Rojo = bajo desempeño.",
+            "Desempeño Docente por Programa",
+            "¿Cómo se desempeña cada docente en su programa? ¿Qué programas y docentes destacan?",
+            "🔹 Cada fila = un docente.\n🔹 Cada columna = un programa.\n🔹 El color indica el desempeño (métrica seleccionada).\n🔹 Verde = alto desempeño, Rojo = bajo desempeño.",
         )
 
         if (
@@ -390,10 +471,10 @@ def main():
             docentes_validos = docentes_count[docentes_count >= 1].index
             df_heatmap = df_heatmap.loc[df_heatmap.index.isin(docentes_validos)]
 
-            areas_count = df_filtrado.groupby("area").size()
-            areas_validas = areas_count[areas_count >= 1].index
+            programas_count = df_filtrado.groupby("area").size()
+            programas_validos = programas_count[programas_count >= 1].index
             df_heatmap = df_heatmap[
-                df_heatmap.columns[df_heatmap.columns.isin(areas_validas)]
+                df_heatmap.columns[df_heatmap.columns.isin(programas_validos)]
             ]
 
             if (
@@ -408,12 +489,12 @@ def main():
 
                 fig_heatmap = px.imshow(
                     df_heatmap,
-                    title=f"Mapa de Calor: {METRICAS_CONFIG[metrica_heatmap]['nombre']} por Docente y Área",
+                    title=f"Mapa de Calor: {METRICAS_CONFIG[metrica_heatmap]['nombre']} por Docente y Programa",
                     color_continuous_scale="RdYlGn",
                     aspect="auto",
                     text_auto=True,
                     labels={
-                        "x": "Área",
+                        "x": "Programa",
                         "y": "Docente",
                         "color": METRICAS_CONFIG[metrica_heatmap]["nombre"],
                     },
@@ -434,49 +515,57 @@ def main():
                 mejor_valor = promedios.iloc[0] if len(promedios) > 0 else 0
                 peor_valor = promedios.iloc[-1] if len(promedios) > 0 else 0
 
-                promedios_area = df_heatmap.mean(axis=0).sort_values(ascending=False)
-                mejor_area = (
-                    promedios_area.index[0] if len(promedios_area) > 0 else "N/A"
+                promedios_programa = df_heatmap.mean(axis=0).sort_values(
+                    ascending=False
                 )
-                peor_area = (
-                    promedios_area.index[-1] if len(promedios_area) > 0 else "N/A"
+                mejor_programa = (
+                    promedios_programa.index[0]
+                    if len(promedios_programa) > 0
+                    else "N/A"
+                )
+                peor_programa = (
+                    promedios_programa.index[-1]
+                    if len(promedios_programa) > 0
+                    else "N/A"
                 )
 
                 if not df_heatmap.empty:
                     max_cell = df_heatmap.max().max()
                     min_cell = df_heatmap.min().min()
                     max_docente = df_heatmap.stack().idxmax()[0]
-                    max_area = df_heatmap.stack().idxmax()[1]
+                    max_programa = df_heatmap.stack().idxmax()[1]
                     min_docente = df_heatmap.stack().idxmin()[0]
-                    min_area = df_heatmap.stack().idxmin()[1]
+                    min_programa = df_heatmap.stack().idxmin()[1]
                 else:
                     max_cell = min_cell = 0
-                    max_docente = max_area = min_docente = min_area = "N/A"
+                    max_docente = max_programa = min_docente = min_programa = "N/A"
 
-                que_muestra = f"Este mapa de calor muestra el desempeño de {len(df_heatmap)} docentes en {len(df_heatmap.columns)} áreas, medido por {METRICAS_CONFIG[metrica_heatmap]['nombre']}. Los colores VERDES indican alto desempeño y ROJOS bajo desempeño."
+                que_muestra = f"Este mapa de calor muestra el desempeño de {len(df_heatmap)} docentes en {len(df_heatmap.columns)} programas, medido por {METRICAS_CONFIG[metrica_heatmap]['nombre']}. Los colores VERDES indican alto desempeño y ROJOS bajo desempeño."
 
                 if max_docente != "N/A":
-                    que_muestra += f" El mejor desempeño es de {max_docente} en {max_area} con {max_cell:.2f}. El peor es {min_docente} en {min_area} con {min_cell:.2f}."
+                    que_muestra += f" El mejor desempeño es de {max_docente} en {max_programa} con {max_cell:.2f}. El peor es {min_docente} en {min_programa} con {min_cell:.2f}."
 
                 if mejor_docente != "N/A":
                     que_muestra += f" {mejor_docente} es el docente con mejor promedio ({mejor_valor:.2f}) y {peor_docente} el de menor ({peor_valor:.2f})."
 
-                if mejor_area != "N/A":
-                    que_muestra += f" {mejor_area} es el área con mejor desempeño y {peor_area} el de menor."
+                if mejor_programa != "N/A":
+                    que_muestra += f" {mejor_programa} es el programa con mejor desempeño y {peor_programa} el de menor."
 
-                como_leer = f"🔹 Cada FILA = un docente.\n🔹 Cada COLUMNA = un área.\n🔹 COLOR:\n   🟢 Verde = alto {METRICAS_CONFIG[metrica_heatmap]['nombre']}\n   🟡 Amarillo = promedio\n   🔴 Rojo = bajo {METRICAS_CONFIG[metrica_heatmap]['nombre']}\n🔹 Docentes ordenados de mejor a peor promedio (arriba = mejores)."
+                como_leer = f"🔹 Cada FILA = un docente.\n🔹 Cada COLUMNA = un programa.\n🔹 COLOR:\n   🟢 Verde = alto {METRICAS_CONFIG[metrica_heatmap]['nombre']}\n   🟡 Amarillo = promedio\n   🔴 Rojo = bajo {METRICAS_CONFIG[metrica_heatmap]['nombre']}\n🔹 Docentes ordenados de mejor a peor promedio (arriba = mejores)."
 
-                que_buscar = f"🎯 Busca:\n🔹 Filas VERDES completas → docentes excelentes en todo.\n🔹 Columnas VERDES completas → áreas con buen desempeño.\n🔹 Celdas ROJAS → puntos de mejora específicos."
+                que_buscar = f"🎯 Busca:\n🔹 Filas VERDES completas → docentes excelentes en todo.\n🔹 Columnas VERDES completas → programas con buen desempeño.\n🔹 Celdas ROJAS → puntos de mejora específicos."
 
                 if mejor_docente != "N/A":
                     que_buscar += f"\n🔹 {mejor_docente} es el mejor docente promedio."
                 if peor_docente != "N/A":
                     que_buscar += f"\n🔹 {peor_docente} necesita mejorar."
-                if mejor_area != "N/A":
-                    que_buscar += f"\n🔹 {mejor_area} es el área con mejor desempeño."
+                if mejor_programa != "N/A":
+                    que_buscar += (
+                        f"\n🔹 {mejor_programa} es el programa con mejor desempeño."
+                    )
 
                 mostrar_interpretacion_grafica(
-                    f"Cómo interpretar el Mapa de Calor de {METRICAS_CONFIG[metrica_heatmap]['nombre']} por Docente y Área",
+                    f"Cómo interpretar el Mapa de Calor de {METRICAS_CONFIG[metrica_heatmap]['nombre']} por Docente y Programa",
                     que_muestra,
                     como_leer,
                     que_buscar,
@@ -484,7 +573,7 @@ def main():
 
             else:
                 st.warning(
-                    "⚠️ No hay suficientes datos para generar el mapa de calor. Se necesitan al menos 1 docente y 1 área con datos."
+                    "⚠️ No hay suficientes datos para generar el mapa de calor. Se necesitan al menos 1 docente y 1 programa con datos."
                 )
         else:
             st.warning(
@@ -492,15 +581,15 @@ def main():
             )
 
     # ================================================================
-    # GRÁFICA 3: Barras Horizontales - Ranking por Área
+    # GRÁFICA 3: Barras Horizontales - Ranking por Programa
     # ================================================================
     with st.expander(
-        "📊 Gráfica 3: Barras Horizontales - Ranking por Área", expanded=False
+        "📊 Gráfica 3: Barras Horizontales - Ranking por Programa", expanded=False
     ):
         mostrar_leyenda_grafica(
-            "Ranking de Áreas",
-            "¿Qué áreas tienen mejor desempeño en cada métrica?",
-            "🔹 Cada barra representa el promedio de un área.\n🔹 La línea roja marca el límite de cumplimiento.\n🔹 Barras verdes = cumplen, rojas = no cumplen.",
+            "Ranking de Programas",
+            "¿Qué programas tienen mejor desempeño en cada métrica?",
+            "🔹 Cada barra representa el promedio de un programa.\n🔹 La línea roja marca el límite de cumplimiento.\n🔹 Barras verdes = cumplen, rojas = no cumplen.",
         )
 
         if "area" in df_filtrado.columns and metricas_disp:
@@ -529,8 +618,8 @@ def main():
                     )
                 )
                 total = len(df_area)
-                mejor_area = df_area.loc[df_area[metrica_bar_h].idxmax(), "area"]
-                peor_area = df_area.loc[df_area[metrica_bar_h].idxmin(), "area"]
+                mejor_programa = df_area.loc[df_area[metrica_bar_h].idxmax(), "area"]
+                peor_programa = df_area.loc[df_area[metrica_bar_h].idxmin(), "area"]
                 promedio = df_area[metrica_bar_h].mean()
                 limite = METRICAS_CONFIG[metrica_bar_h]["limite_cumple"]
 
@@ -565,31 +654,31 @@ def main():
                     annotation_text=f"Límite: {limite}",
                 )
                 fig_bar_h.update_layout(
-                    title=f"Ranking de Áreas - {METRICAS_CONFIG[metrica_bar_h]['nombre']}",
+                    title=f"Ranking de Programas - {METRICAS_CONFIG[metrica_bar_h]['nombre']}",
                     template="plotly_white",
                     height=max(400, len(df_area) * 40),
                     xaxis_title=METRICAS_CONFIG[metrica_bar_h]["nombre"],
-                    yaxis_title="Área",
+                    yaxis_title="Programa",
                 )
                 st.plotly_chart(fig_bar_h, use_container_width=True)
 
                 mostrar_interpretacion_grafica(
-                    f"Cómo interpretar el Ranking de Áreas en {METRICAS_CONFIG[metrica_bar_h]['nombre']}",
-                    f"{cumple_count} de {total} áreas ({cumple_count/total*100:.1f}%) cumplen con el estándar. El promedio general es {METRICAS_CONFIG[metrica_bar_h]['formato'].format(promedio)}. {mejor_area} es el área con mejor desempeño y {peor_area} el peor.",
+                    f"Cómo interpretar el Ranking de Programas en {METRICAS_CONFIG[metrica_bar_h]['nombre']}",
+                    f"{cumple_count} de {total} programas ({cumple_count/total*100:.1f}%) cumplen con el estándar. El promedio general es {METRICAS_CONFIG[metrica_bar_h]['formato'].format(promedio)}. {mejor_programa} es el programa con mejor desempeño y {peor_programa} el peor.",
                     f"🔹 Las barras VERDES cumplen con el estándar (a la derecha de la línea roja).\n🔹 Las barras ROJAS NO cumplen (a la izquierda).\n🔹 Barras más largas = mejor desempeño.",
-                    f"🎯 Busca qué áreas están a la derecha de la línea roja (cumplen) y cuáles a la izquierda (no cumplen). {mejor_area} es el área con mejor desempeño.",
+                    f"🎯 Busca qué programas están a la derecha de la línea roja (cumplen) y cuáles a la izquierda (no cumplen). {mejor_programa} es el programa con mejor desempeño.",
                 )
 
     # ================================================================
-    # GRÁFICA 4: Barras Verticales - Distribución por Área
+    # GRÁFICA 4: Barras Verticales - Distribución por Programa
     # ================================================================
     with st.expander(
-        "📊 Gráfica 4: Barras Verticales - Distribución por Área", expanded=False
+        "📊 Gráfica 4: Barras Verticales - Distribución por Programa", expanded=False
     ):
         mostrar_leyenda_grafica(
-            "Distribución de Grabaciones por Área",
-            "¿Qué áreas tienen más grabaciones y cómo se distribuyen?",
-            "🔹 Cada barra representa un área.\n🔹 El color muestra la clase (Verde=ENTRETENIDO, Rojo=ABURRIDO).\n🔹 Altura de barra = cantidad de grabaciones.",
+            "Distribución de Grabaciones por Programa",
+            "¿Qué programas tienen más grabaciones y cómo se distribuyen?",
+            "🔹 Cada barra representa un programa.\n🔹 El color muestra la clase (Verde=ENTRETENIDO, Rojo=ABURRIDO).\n🔹 Altura de barra = cantidad de grabaciones.",
         )
 
         if "area" in df_filtrado.columns and "Clase_Predicha" in df_filtrado.columns:
@@ -612,7 +701,7 @@ def main():
                         "ENTRETENIDO": "#2e7d32",
                         "ABURRIDO": "#c62828",
                     },
-                    title="Distribución de Grabaciones por Área y Clase",
+                    title="Distribución de Grabaciones por Programa y Clase",
                     text="count",
                     barmode="group",
                 )
@@ -620,7 +709,7 @@ def main():
                 fig_bar_v.update_layout(
                     template="plotly_white",
                     height=450,
-                    xaxis_title="Área",
+                    xaxis_title="Programa",
                     yaxis_title="Número de Grabaciones",
                 )
                 st.plotly_chart(fig_bar_v, use_container_width=True)
@@ -634,7 +723,7 @@ def main():
                 total = total_entretenido + total_aburrido
                 pct_entretenido = (total_entretenido / total) * 100 if total > 0 else 0
 
-                mejor_area = (
+                mejor_programa = (
                     df_area_clase[df_area_clase["Clase_Predicha"] == "ENTRETENIDO"].loc[
                         df_area_clase[df_area_clase["Clase_Predicha"] == "ENTRETENIDO"][
                             "count"
@@ -644,7 +733,7 @@ def main():
                     if total_entretenido > 0
                     else "N/A"
                 )
-                peor_area = (
+                peor_programa = (
                     df_area_clase[df_area_clase["Clase_Predicha"] == "ABURRIDO"].loc[
                         df_area_clase[df_area_clase["Clase_Predicha"] == "ABURRIDO"][
                             "count"
@@ -656,10 +745,10 @@ def main():
                 )
 
                 mostrar_interpretacion_grafica(
-                    "Cómo interpretar la Distribución de Grabaciones por Área",
-                    f"De {total} grabaciones, {total_entretenido} ({pct_entretenido:.1f}%) son ENTRETENIDAS y {total_aburrido} ({100-pct_entretenido:.1f}%) son ABURRIDAS. {mejor_area} tiene más clases ENTRETENIDAS. {peor_area} tiene más clases ABURRIDAS.",
-                    f"🔹 Cada barra representa un área.\n🔹 VERDE = clases ENTRETENIDAS.\n🔹 ROJO = clases ABURRIDAS.\n🔹 Más VERDE que ROJO = área con buena calidad.",
-                    f"🎯 Busca áreas con más VERDE que ROJO (buena calidad). Las áreas con mucho ROJO necesitan mejorar.",
+                    "Cómo interpretar la Distribución de Grabaciones por Programa",
+                    f"De {total} grabaciones, {total_entretenido} ({pct_entretenido:.1f}%) son ENTRETENIDAS y {total_aburrido} ({100-pct_entretenido:.1f}%) son ABURRIDAS. {mejor_programa} tiene más clases ENTRETENIDAS. {peor_programa} tiene más clases ABURRIDAS.",
+                    f"🔹 Cada barra representa un programa.\n🔹 VERDE = clases ENTRETENIDAS.\n🔹 ROJO = clases ABURRIDAS.\n🔹 Más VERDE que ROJO = programa con buena calidad.",
+                    f"🎯 Busca programas con más VERDE que ROJO (buena calidad). Los programas con mucho ROJO necesitan mejorar.",
                 )
 
     # ================================================================
@@ -729,13 +818,15 @@ def main():
                 )
 
     # ================================================================
-    # GRÁFICA 6: Lollipop Chart - Ranking por Área
+    # GRÁFICA 6: Lollipop Chart - Ranking por Programa
     # ================================================================
-    with st.expander("🍭 Gráfica 6: Lollipop Chart - Ranking por Área", expanded=False):
+    with st.expander(
+        "🍭 Gráfica 6: Lollipop Chart - Ranking por Programa", expanded=False
+    ):
         mostrar_leyenda_grafica(
-            "Ranking por Área",
-            "¿Qué áreas tienen mejor desempeño en cada métrica?",
-            "🔹 Cada 'lollipop' (paleta) muestra un área.\n🔹 La línea conecta el valor con el área.\n🔹 La línea roja marca el límite de cumplimiento.\n🔹 Áreas verdes = cumplen, rojas = no cumplen.",
+            "Ranking por Programa",
+            "¿Qué programas tienen mejor desempeño en cada métrica?",
+            "🔹 Cada 'lollipop' (paleta) muestra un programa.\n🔹 La línea conecta el valor con el programa.\n🔹 La línea roja marca el límite de cumplimiento.\n🔹 Programas verdes = cumplen, rojas = no cumplen.",
         )
 
         if "area" in df_filtrado.columns and metricas_disp:
@@ -754,8 +845,8 @@ def main():
             )
 
             if not df_lollipop.empty:
-                mejor_area = df_lollipop.loc[df_lollipop[metrica_lollipop].idxmax()]
-                peor_area = df_lollipop.loc[df_lollipop[metrica_lollipop].idxmin()]
+                mejor_programa = df_lollipop.loc[df_lollipop[metrica_lollipop].idxmax()]
+                peor_programa = df_lollipop.loc[df_lollipop[metrica_lollipop].idxmin()]
                 cumple_count = sum(
                     1
                     for _, row in df_lollipop.iterrows()
@@ -809,29 +900,29 @@ def main():
                     annotation_text=f"Límite: {limite}",
                 )
                 fig_lollipop.update_layout(
-                    title=f"Ranking por Área - {METRICAS_CONFIG[metrica_lollipop]['nombre']}",
+                    title=f"Ranking por Programa - {METRICAS_CONFIG[metrica_lollipop]['nombre']}",
                     template="plotly_white",
                     height=max(400, len(df_lollipop) * 35),
                     xaxis_title=METRICAS_CONFIG[metrica_lollipop]["nombre"],
-                    yaxis_title="Área",
+                    yaxis_title="Programa",
                 )
                 st.plotly_chart(fig_lollipop, use_container_width=True)
 
                 mostrar_interpretacion_grafica(
-                    f"Cómo interpretar el Ranking por Área en {METRICAS_CONFIG[metrica_lollipop]['nombre']}",
-                    f"{cumple_count} de {total} áreas ({cumple_count/total*100:.1f}%) cumplen con el estándar ({limite}). {mejor_area['area']} es la #1 con {METRICAS_CONFIG[metrica_lollipop]['formato'].format(mejor_area[metrica_lollipop])}. {peor_area['area']} tiene el valor más bajo.",
-                    f"🔹 Los círculos VERDES cumplen con el estándar.\n🔹 Los círculos ROJOS NO cumplen.\n🔹 Las áreas más a la DERECHA tienen mejor desempeño.\n🔹 La línea ROJA es el límite de cumplimiento.",
-                    f"🎯 Busca qué áreas están a la derecha de la línea roja (cumplen) y cuáles a la izquierda (no cumplen).",
+                    f"Cómo interpretar el Ranking por Programa en {METRICAS_CONFIG[metrica_lollipop]['nombre']}",
+                    f"{cumple_count} de {total} programas ({cumple_count/total*100:.1f}%) cumplen con el estándar ({limite}). {mejor_programa['area']} es la #1 con {METRICAS_CONFIG[metrica_lollipop]['formato'].format(mejor_programa[metrica_lollipop])}. {peor_programa['area']} tiene el valor más bajo.",
+                    f"🔹 Los círculos VERDES cumplen con el estándar.\n🔹 Los círculos ROJOS NO cumplen.\n🔹 Los programas más a la DERECHA tienen mejor desempeño.\n🔹 La línea ROJA es el límite de cumplimiento.",
+                    f"🎯 Busca qué programas están a la derecha de la línea roja (cumplen) y cuáles a la izquierda (no cumplen).",
                 )
 
     # ================================================================
-    # GRÁFICA 7: Scatter Plot - Relación entre métricas
+    # GRÁFICA 7: Barras - Comparación de Métricas por Clase
     # ================================================================
-    with st.expander("🎯 Scatter Plot - Relación entre métricas", expanded=False):
+    with st.expander("📊 Gráfica 7: Comparación de Métricas por Clase", expanded=False):
         mostrar_leyenda_grafica(
-            "Relación entre métricas",
-            "¿Cómo se relacionan dos métricas? ¿Los docentes con mejor desempeño en una también tienen mejor desempeño en otra?",
-            "🔹 Cada punto = un docente.\n🔹 Eje X = métrica 1.\n🔹 Eje Y = métrica 2.\n🔹 Color = clase (🟢 ENTRETENIDO / 🔴 ABURRIDO).\n🔹 Tamaño = número de grabaciones.",
+            "Comparación de Métricas por Clase",
+            "¿Cómo se comparan las métricas entre clases ENTRETENIDO y ABURRIDO?",
+            "🔹 Cada barra representa el promedio de una métrica.\n🔹 🟢 Verde = ENTRETENIDO (buena calidad).\n🔹 🔴 Rojo = ABURRIDO (mala calidad).\n🔹 Barras más altas = mejor desempeño.",
         )
 
         metricas_disponibles = [
@@ -850,100 +941,115 @@ def main():
             col for col in metricas_disponibles if col in df_filtrado.columns
         ]
 
-        if len(metricas_existentes) >= 2:
-            col1, col2 = st.columns(2)
-            with col1:
-                metrica_x = st.selectbox(
-                    "Métrica en Eje X", options=metricas_existentes, key="scatter_x"
-                )
-            with col2:
-                metrica_y = st.selectbox(
-                    "Métrica en Eje Y", options=metricas_existentes, key="scatter_y"
-                )
+        if metricas_existentes:
+            metrica_seleccionada = st.selectbox(
+                "Selecciona una métrica para comparar:",
+                options=metricas_existentes,
+                format_func=lambda x: METRICAS_CONFIG[x]["nombre"],
+                key="bar_clase_metrica",
+            )
 
-            if metrica_x == metrica_y:
-                st.warning(
-                    "⚠️ Las métricas en ambos ejes deben ser diferentes. Selecciona dos métricas distintas."
+            df_entretenido = df_filtrado[df_filtrado["Clase_Predicha"] == "ENTRETENIDO"]
+            df_aburrido = df_filtrado[df_filtrado["Clase_Predicha"] == "ABURRIDO"]
+
+            prom_entretenido = (
+                df_entretenido[metrica_seleccionada].mean()
+                if not df_entretenido.empty
+                else 0
+            )
+            prom_aburrido = (
+                df_aburrido[metrica_seleccionada].mean() if not df_aburrido.empty else 0
+            )
+
+            df_barras = pd.DataFrame(
+                {
+                    "Clase": ["ENTRETENIDO", "ABURRIDO"],
+                    "Promedio": [prom_entretenido, prom_aburrido],
+                    "Color": ["#2e7d32", "#c62828"],
+                }
+            )
+
+            count_entretenido = len(df_entretenido)
+            count_aburrido = len(df_aburrido)
+
+            fig_barras = go.Figure()
+            fig_barras.add_trace(
+                go.Bar(
+                    x=df_barras["Clase"],
+                    y=df_barras["Promedio"],
+                    text=df_barras["Promedio"].apply(lambda x: f"{x:.3f}"),
+                    textposition="outside",
+                    marker=dict(color=df_barras["Color"]),
+                    hovertemplate="<b>%{x}</b><br>Promedio: %{y:.3f}<br>Grabaciones: %{customdata}<extra></extra>",
+                    customdata=[count_entretenido, count_aburrido],
+                )
+            )
+
+            limite = METRICAS_CONFIG[metrica_seleccionada].get("limite_cumple")
+            if limite is not None:
+                condicion = METRICAS_CONFIG[metrica_seleccionada].get("condicion")
+                if condicion == "mayor":
+                    fig_barras.add_hline(
+                        y=limite,
+                        line_dash="dash",
+                        line_color="red",
+                        annotation_text=f"Límite: {limite}",
+                        annotation_position="top right",
+                    )
+                elif condicion == "menor":
+                    fig_barras.add_hline(
+                        y=limite,
+                        line_dash="dash",
+                        line_color="red",
+                        annotation_text=f"Límite: {limite}",
+                        annotation_position="bottom right",
+                    )
+
+            fig_barras.update_layout(
+                height=450,
+                template="plotly_white",
+                xaxis_title="Clase",
+                yaxis_title=METRICAS_CONFIG[metrica_seleccionada]["nombre"],
+                showlegend=False,
+                margin=dict(l=40, r=40, t=30, b=40),
+            )
+
+            st.plotly_chart(fig_barras, use_container_width=True)
+
+            diferencia = prom_entretenido - prom_aburrido
+            mejor_clase = (
+                "ENTRETENIDO" if prom_entretenido > prom_aburrido else "ABURRIDO"
+            )
+            condicion = METRICAS_CONFIG[metrica_seleccionada]["condicion"]
+
+            if condicion == "mayor" or condicion == "mayor_igual":
+                mejor_texto = "mejor (mayor es mejor)"
+            elif condicion == "menor" or condicion == "menor_igual":
+                mejor_texto = "mejor (menor es mejor)"
+            else:
+                mejor_texto = "mejor"
+
+            que_muestra = f"Este gráfico compara el promedio de {METRICAS_CONFIG[metrica_seleccionada]['nombre']} entre clases ENTRETENIDO y ABURRIDO. Los ENTRETENIDOS tienen un promedio de {prom_entretenido:.3f} ({count_entretenido} grabaciones) y los ABURRIDOS de {prom_aburrido:.3f} ({count_aburrido} grabaciones). La diferencia es de {diferencia:+.3f}."
+
+            if diferencia > 0:
+                que_muestra += (
+                    f" Los ENTRETENIDOS tienen mejor desempeño en esta métrica."
                 )
             else:
-                df_scatter = (
-                    df_filtrado.groupby("nombres_apellidos")
-                    .agg(
-                        metrica_x=(metrica_x, "mean"),
-                        metrica_y=(metrica_y, "mean"),
-                        Clase=(
-                            "Clase_Predicha",
-                            lambda x: (
-                                x.mode()[0] if not x.mode().empty else "Sin Clase"
-                            ),
-                        ),
-                        Grabaciones=("nombres_apellidos", "count"),
-                    )
-                    .reset_index()
-                )
+                que_muestra += f" Los ABURRIDOS tienen mejor desempeño en esta métrica."
 
-                df_scatter.columns = [
-                    "Docente",
-                    f"EjeX_{metrica_x}",
-                    f"EjeY_{metrica_y}",
-                    "Clase",
-                    "Grabaciones",
-                ]
-                df_scatter = df_scatter.dropna(
-                    subset=[f"EjeX_{metrica_x}", f"EjeY_{metrica_y}", "Clase"]
-                )
+            como_leer = f"🔹 Cada barra = promedio de la métrica.\n🔹 🟢 Verde = ENTRETENIDO.\n🔹 🔴 Rojo = ABURRIDO.\n🔹 La línea roja = límite de cumplimiento (si existe).\n🔹 Barras más altas = mejor desempeño (para métricas donde 'mayor es mejor')."
 
-                if not df_scatter.empty:
-                    fig_scatter = go.Figure()
-                    color_map = {"ENTRETENIDO": "#2e7d32", "ABURRIDO": "#c62828"}
+            que_buscar = f"🎯 Busca:\n🔹 La diferencia entre las dos barras.\n🔹 Qué clase está por encima del límite (línea roja).\n🔹 {mejor_clase} es la clase con {mejor_texto}."
 
-                    for clase in ["ENTRETENIDO", "ABURRIDO"]:
-                        df_clase = df_scatter[df_scatter["Clase"] == clase]
-                        if not df_clase.empty:
-                            fig_scatter.add_trace(
-                                go.Scatter(
-                                    x=df_clase[f"EjeX_{metrica_x}"],
-                                    y=df_clase[f"EjeY_{metrica_y}"],
-                                    mode="markers+text",
-                                    name=clase,
-                                    marker=dict(
-                                        size=df_clase["Grabaciones"].apply(
-                                            lambda x: max(8, min(30, x * 2))
-                                        ),
-                                        color=color_map.get(clase, "#6c757d"),
-                                        opacity=0.8,
-                                        line=dict(width=1, color="white"),
-                                    ),
-                                    text=df_clase["Docente"],
-                                    textposition="top center",
-                                    textfont=dict(size=9),
-                                    hovertemplate="<b>%{text}</b><br>"
-                                    f"{metrica_x}: %{{x:.3f}}<br>"
-                                    f"{metrica_y}: %{{y:.3f}}<br>"
-                                    f"Grabaciones: %{{customdata}}<br>Clase: {clase}<extra></extra>",
-                                    customdata=df_clase["Grabaciones"],
-                                )
-                            )
-
-                    fig_scatter.update_layout(
-                        height=500,
-                        template="plotly_white",
-                        xaxis_title=metrica_x,
-                        yaxis_title=metrica_y,
-                        hovermode="closest",
-                        legend=dict(
-                            orientation="h",
-                            yanchor="bottom",
-                            y=1.02,
-                            xanchor="center",
-                            x=0.5,
-                        ),
-                    )
-                    st.plotly_chart(fig_scatter, use_container_width=True)
-                else:
-                    st.warning("⚠️ No hay datos para el scatter plot")
+            mostrar_interpretacion_grafica(
+                f"Cómo interpretar la Comparación de {METRICAS_CONFIG[metrica_seleccionada]['nombre']} por Clase",
+                que_muestra,
+                como_leer,
+                que_buscar,
+            )
         else:
-            st.warning("⚠️ Se necesitan al menos 2 métricas disponibles")
+            st.warning("⚠️ No hay métricas disponibles para comparar.")
 
 
 # ================================================================
