@@ -34,6 +34,7 @@ def load_data():
             return None
 
         df = pd.read_excel(excel_path)
+        st.write(df.columns.tolist())
 
         multi_value_cols = [
             "grupo",
