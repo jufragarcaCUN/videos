@@ -14,6 +14,13 @@ import streamlit as st
 
 warnings.filterwarnings("ignore")
 
+
+# ==================== FUNCIÓN DE ALTURA ====================
+def altura():
+    """Devuelve la altura seleccionada para las gráficas (en píxeles). Por defecto 600 px."""
+    return st.session_state.get("altura_grafica", 600)
+
+
 # ==================== CONFIGURACIÓN DE MÉTRICAS ====================
 METRICAS_CONFIG = {
     "CPM": {
@@ -21,46 +28,33 @@ METRICAS_CONFIG = {
         "columna": "CPM",
         "unidad": "cortes/min",
         "que_mide": "Frecuencia de cortes visuales o ediciones en el video.",
-        "como_mide": (
-            "Se analiza el video frame por frame, detectando cambios bruscos"
-            " de escena."
-        ),
+        "como_mide": "Se analiza el video frame por frame, detectando cambios bruscos de escena.",
         "formato": "{:.1f}",
         "limite_cumple": 18.0,
         "condicion": "mayor",
-        "interpretacion": ("Un valor > 18.0 indica un video dinámico con buen ritmo."),
+        "interpretacion": "Un valor > 18.0 indica un video dinámico con buen ritmo.",
     },
     "DME_s": {
         "nombre": "Duración del monólogo",
         "columna": "DME_s",
         "unidad": "segundos",
         "que_mide": "Tiempo continuo que habla el profesor sin hacer pausas.",
-        "como_mide": (
-            "Se procesa el audio del video, detectando segmentos de habla" " continua."
-        ),
+        "como_mide": "Se procesa el audio del video, detectando segmentos de habla continua.",
         "formato": "{:.1f}s",
         "limite_cumple": 3.5,
         "condicion": "menor",
-        "interpretacion": (
-            "Un valor < 3.5 segundos indica un ritmo dinámico con pausas" " frecuentes."
-        ),
+        "interpretacion": "Un valor < 3.5 segundos indica un ritmo dinámico con pausas frecuentes.",
     },
     "DTE_ratio": {
         "nombre": "Porcentaje de habla",
         "columna": "DTE_ratio",
         "unidad": "",
-        "que_mide": (
-            "Proporción del tiempo total del video en el que el profesor tiene"
-            " voz activa."
-        ),
-        "como_mide": (
-            "Se analiza el audio y se calcula el tiempo con voz activa"
-            " dividido por el total."
-        ),
+        "que_mide": "Proporción del tiempo total del video en el que el profesor tiene voz activa.",
+        "como_mide": "Se analiza el audio y se calcula el tiempo con voz activa dividido por el total.",
         "formato": "{:.3f}",
         "limite_cumple": 0.50,
         "condicion": "menor_igual",
-        "interpretacion": ("Un valor ≤ 0.50 indica una clase más interactiva."),
+        "interpretacion": "Un valor ≤ 0.50 indica una clase más interactiva.",
     },
     "Jitter_Score": {
         "nombre": "Estabilidad técnica",
@@ -82,9 +76,7 @@ METRICAS_CONFIG = {
         "formato": "{:.3f}",
         "limite_cumple": 4.0,
         "condicion": "mayor",
-        "interpretacion": (
-            "Un valor > 4.0 indica una clase dinámica con movimiento activo."
-        ),
+        "interpretacion": "Un valor > 4.0 indica una clase dinámica con movimiento activo.",
     },
     "sigma2_IM": {
         "nombre": "Cambios de movimiento",
@@ -95,20 +87,18 @@ METRICAS_CONFIG = {
         "formato": "{:.3f}",
         "limite_cumple": 8.5,
         "condicion": "mayor",
-        "interpretacion": ("Un valor > 8.5 indica cambios de movimiento dinámicos."),
+        "interpretacion": "Un valor > 8.5 indica cambios de movimiento dinámicos.",
     },
     "Tone_CoV": {
         "nombre": "Variación de la voz",
         "columna": "Tone_CoV",
         "unidad": "",
         "que_mide": "Variación y modulación del tono de voz del profesor.",
-        "como_mide": ("Se extrae la frecuencia fundamental y se calcula su variación."),
+        "como_mide": "Se extrae la frecuencia fundamental y se calcula su variación.",
         "formato": "{:.3f}",
         "limite_cumple": 0.32,
         "condicion": "mayor",
-        "interpretacion": (
-            "Un valor > 0.32 indica una voz dinámica con variaciones de tono."
-        ),
+        "interpretacion": "Un valor > 0.32 indica una voz dinámica con variaciones de tono.",
     },
     "Enthusiasm_Score": {
         "nombre": "Nivel de energía",
@@ -119,9 +109,7 @@ METRICAS_CONFIG = {
         "formato": "{:.3f}",
         "limite_cumple": 0.15,
         "condicion": "mayor",
-        "interpretacion": (
-            "Un valor > 0.15 indica una clase con energía y entusiasmo."
-        ),
+        "interpretacion": "Un valor > 0.15 indica una clase con energía y entusiasmo.",
     },
 }
 
@@ -286,15 +274,13 @@ with st.expander(
     expanded=True,
 ):
 
-    st.markdown(
-        f"""
+    st.markdown(f"""
     **📌 Columna en Excel:** `{config['columna']}`  
     **📌 ¿Qué mide?** {config['que_mide']}  
     **🔬 ¿Cómo se mide?** {config['como_mide']}  
     **🎯 Línea roja en: {config['limite_cumple']}**  
     **📖 Interpretación:** {config['interpretacion']}
-    """
-    )
+    """)
 
     if "nombres_apellidos" in df_filtrado.columns:
         datos_docentes = (
@@ -355,7 +341,7 @@ with st.expander(
             fig.update_traces(textposition="outside")
             fig.update_layout(
                 template="plotly_white",
-                height=max(400, len(datos_docentes) * 50),
+                height=altura(),  # <--- USANDO altura()
                 showlegend=False,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
@@ -377,15 +363,13 @@ with st.expander(
     expanded=False,
 ):
 
-    st.markdown(
-        f"""
+    st.markdown(f"""
     **📌 Columna en Excel:** `{config['columna']}`  
     **📌 ¿Qué mide?** {config['que_mide']}  
     **🔬 ¿Cómo se mide?** {config['como_mide']}  
     **🎯 Línea roja en: {config['limite_cumple']}**  
     **📖 Interpretación:** {config['interpretacion']}
-    """
-    )
+    """)
 
     if "area" in df_filtrado.columns:
         datos_areas = df_filtrado.groupby("area")[col_metrica].mean().reset_index()
@@ -444,7 +428,7 @@ with st.expander(
             fig.update_traces(textposition="outside")
             fig.update_layout(
                 template="plotly_white",
-                height=max(400, len(datos_areas) * 60),
+                height=altura(),  # <--- USANDO altura()
                 showlegend=False,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
@@ -466,15 +450,13 @@ with st.expander(
     expanded=False,
 ):
 
-    st.markdown(
-        f"""
+    st.markdown(f"""
     **📌 Columna en Excel:** `{config['columna']}`  
     **📌 ¿Qué mide?** {config['que_mide']}  
     **🔬 ¿Cómo se mide?** {config['como_mide']}  
     **🎯 Línea roja en: {config['limite_cumple']}**  
     **📖 Interpretación:** {config['interpretacion']}
-    """
-    )
+    """)
 
     if "nom_materia" in df_filtrado.columns:
         datos_materias = (
@@ -539,7 +521,7 @@ with st.expander(
             fig.update_traces(textposition="outside")
             fig.update_layout(
                 template="plotly_white",
-                height=max(400, len(datos_materias) * 50),
+                height=altura(),  # <--- USANDO altura()
                 showlegend=False,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",

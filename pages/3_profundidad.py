@@ -367,7 +367,8 @@ def main():
     # GRÁFICA 1: Radar Chart
     # ================================================================
     with st.expander(
-        "🕸️ Gráfica 1: Radar Chart - Perfil Multidimensional del Docente", expanded=False
+        "🕸️ Gráfica 1: Radar Chart - Perfil Multidimensional del Docente",
+        expanded=False,
     ):
         mostrar_leyenda_grafica(
             "Perfil Multidimensional del Docente",
