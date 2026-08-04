@@ -17,44 +17,44 @@ warnings.filterwarnings("ignore")
 
 # ==================== FUNCIÓN DE ALTURA ====================
 def altura():
-    """Devuelve la altura seleccionada para las gráficas (en píxeles). Por defecto 600 px."""
     return st.session_state.get("altura_grafica", 600)
 
 
 # ==================== CONFIGURACIÓN DE MÉTRICAS ====================
+# Nombres originales del Excel
 METRICAS_CONFIG = {
-    "CPM": {
-        "nombre": "Cortes o interrupciones",
-        "columna": "CPM",
-        "unidad": "cortes/min",
-        "que_mide": "Frecuencia de cortes visuales o ediciones en el video.",
-        "como_mide": "Se analiza el video frame por frame, detectando cambios bruscos de escena.",
-        "formato": "{:.1f}",
-        "limite_cumple": 18.0,
-        "condicion": "mayor",
-        "interpretacion": "Un valor > 18.0 indica un video dinámico con buen ritmo.",
-    },
-    "DME_s": {
-        "nombre": "Duración del monólogo",
-        "columna": "DME_s",
-        "unidad": "segundos",
-        "que_mide": "Tiempo continuo que habla el profesor sin hacer pausas.",
-        "como_mide": "Se procesa el audio del video, detectando segmentos de habla continua.",
-        "formato": "{:.1f}s",
-        "limite_cumple": 3.5,
-        "condicion": "menor",
-        "interpretacion": "Un valor < 3.5 segundos indica un ritmo dinámico con pausas frecuentes.",
-    },
-    "DTE_ratio": {
-        "nombre": "Porcentaje de habla",
-        "columna": "DTE_ratio",
+    "Tone_CoV": {
+        "nombre": "Variación de la voz",
+        "columna": "Tone_CoV",
         "unidad": "",
-        "que_mide": "Proporción del tiempo total del video en el que el profesor tiene voz activa.",
-        "como_mide": "Se analiza el audio y se calcula el tiempo con voz activa dividido por el total.",
+        "que_mide": "Variación y modulación del tono de voz del profesor.",
+        "como_mide": "Se extrae la frecuencia fundamental y se calcula su variación.",
         "formato": "{:.3f}",
-        "limite_cumple": 0.50,
-        "condicion": "menor_igual",
-        "interpretacion": "Un valor ≤ 0.50 indica una clase más interactiva.",
+        "limite_cumple": 0.32,
+        "condicion": "mayor",
+        "interpretacion": "Un valor > 0.32 indica una voz dinámica con variaciones de tono.",
+    },
+    "sigma2_IM": {
+        "nombre": "Cambios de movimiento",
+        "columna": "sigma2_IM",
+        "unidad": "",
+        "que_mide": "Qué tan bruscos o dinámicos son los cambios de movimiento.",
+        "como_mide": "Se calcula la varianza de los movimientos entre frames.",
+        "formato": "{:.3f}",
+        "limite_cumple": 8.5,
+        "condicion": "mayor",
+        "interpretacion": "Un valor > 8.5 indica cambios de movimiento dinámicos.",
+    },
+    "Porcentaje_Certeza": {
+        "nombre": "Porcentaje de certeza",
+        "columna": "Porcentaje_Certeza",
+        "unidad": "%",
+        "que_mide": "Confianza en la detección de voz.",
+        "como_mide": "Se calcula a partir del análisis de audio.",
+        "formato": "{:.1f}%",
+        "limite_cumple": 50.0,
+        "condicion": "mayor",
+        "interpretacion": "Un valor alto indica buena calidad de audio.",
     },
     "Jitter_Score": {
         "nombre": "Estabilidad técnica",
@@ -78,44 +78,10 @@ METRICAS_CONFIG = {
         "condicion": "mayor",
         "interpretacion": "Un valor > 4.0 indica una clase dinámica con movimiento activo.",
     },
-    "sigma2_IM": {
-        "nombre": "Cambios de movimiento",
-        "columna": "sigma2_IM",
-        "unidad": "",
-        "que_mide": "Qué tan bruscos o dinámicos son los cambios de movimiento.",
-        "como_mide": "Se calcula la varianza de los movimientos entre frames.",
-        "formato": "{:.3f}",
-        "limite_cumple": 8.5,
-        "condicion": "mayor",
-        "interpretacion": "Un valor > 8.5 indica cambios de movimiento dinámicos.",
-    },
-    "Tone_CoV": {
-        "nombre": "Variación de la voz",
-        "columna": "Tone_CoV",
-        "unidad": "",
-        "que_mide": "Variación y modulación del tono de voz del profesor.",
-        "como_mide": "Se extrae la frecuencia fundamental y se calcula su variación.",
-        "formato": "{:.3f}",
-        "limite_cumple": 0.32,
-        "condicion": "mayor",
-        "interpretacion": "Un valor > 0.32 indica una voz dinámica con variaciones de tono.",
-    },
-    "Enthusiasm_Score": {
-        "nombre": "Nivel de energía",
-        "columna": "Enthusiasm_Score",
-        "unidad": "",
-        "que_mide": "Fuerza y entusiasmo percibido en la voz del profesor.",
-        "como_mide": "Se analizan intensidad, ritmo y variaciones tonales.",
-        "formato": "{:.3f}",
-        "limite_cumple": 0.15,
-        "condicion": "mayor",
-        "interpretacion": "Un valor > 0.15 indica una clase con energía y entusiasmo.",
-    },
 }
 
 
 def verificar_cumplimiento(valor, limite, condicion):
-    """Verifica si un valor cumple con la condición establecida"""
     if limite is None or condicion is None:
         return None
     if condicion == "mayor":
@@ -129,24 +95,64 @@ def verificar_cumplimiento(valor, limite, condicion):
     return None
 
 
+# ==================== CONVERTIR COMAS DECIMALES A PUNTOS ====================
+def convertir_comas_a_puntos(df, columnas_metricas):
+    """
+    Convierte las comas decimales (,) a puntos (.) en las columnas especificadas,
+    y las convierte a tipo float.
+    """
+    df_convertido = df.copy()
+    for col in columnas_metricas:
+        if col in df_convertido.columns:
+            # Si es objeto (texto), reemplazar coma por punto y convertir a float
+            if df_convertido[col].dtype == "object":
+                try:
+                    df_convertido[col] = (
+                        df_convertido[col]
+                        .astype(str)
+                        .str.replace(",", ".")
+                        .astype(float)
+                    )
+                except Exception as e:
+                    st.warning(f"⚠️ No se pudo convertir la columna '{col}': {e}")
+            # Si ya es numérica, no hacer nada
+            elif df_convertido[col].dtype in ["float64", "int64", "float32", "int32"]:
+                pass
+            else:
+                # Para otros tipos, forzar conversión
+                try:
+                    df_convertido[col] = (
+                        df_convertido[col]
+                        .astype(str)
+                        .str.replace(",", ".")
+                        .astype(float)
+                    )
+                except Exception as e:
+                    st.warning(
+                        f"⚠️ No se pudo convertir la columna '{col}' (tipo {df_convertido[col].dtype}): {e}"
+                    )
+    return df_convertido
+
+
 # ==================== OBTENER DATOS DE LA SESIÓN ====================
 if "df_filtrado" in st.session_state and st.session_state["df_filtrado"] is not None:
     df_filtrado = st.session_state["df_filtrado"].copy()
+
+    # ==================== CONVERTIR COMAS DECIMALES A PUNTOS ====================
+    columnas_metricas = list(METRICAS_CONFIG.keys())
+    df_filtrado = convertir_comas_a_puntos(df_filtrado, columnas_metricas)
+
 else:
     st.error(
         "❌ No se encontraron datos cargados. Por favor, recarga el sistema desde la página principal."
     )
     st.stop()
 
-
-# ==================== CONTENIDO PRINCIPAL DE LA PÁGINA ====================
+# ==================== CONTENIDO PRINCIPAL ====================
 st.header("📊 Visión General")
 
-# ====================================================================
-# FILTROS ADICIONALES CON CHECKBOX
-# ====================================================================
+# ---- FILTROS ADICIONALES ----
 st.markdown("### 🔍 Filtros adicionales")
-
 col_c1, col_c2 = st.columns(2)
 
 with col_c1:
@@ -173,9 +179,7 @@ with col_c2:
     else:
         filtro_estado = "Todos"
 
-# ====================================================================
-# APLICAR FILTROS DEL CUERPO
-# ====================================================================
+# Aplicar filtros adicionales
 if activar_clase and filtro_clase != "Todos":
     df_filtrado = df_filtrado[df_filtrado["Clase_Predicha"] == filtro_clase]
 if activar_estado and filtro_estado != "Todos":
@@ -187,12 +191,9 @@ if df_filtrado.empty:
 
 st.info(f"📊 Mostrando {len(df_filtrado)} registros")
 
-# ====================================================================
-# KPIs
-# ====================================================================
+# ---- KPIs ----
 st.markdown("---")
 st.subheader("📊 Resumen Ejecutivo")
-
 col1, col2, col3, col4 = st.columns(4)
 with col1:
     st.metric("Total Grabaciones", len(df_filtrado))
@@ -220,41 +221,15 @@ with col4:
         ),
     )
 
-# ====================================================================
-# COLUMNAS DISPONIBLES
-# ====================================================================
+# ---- SELECCIÓN DE MÉTRICA ----
 st.markdown("---")
-st.markdown("### 📊 Columnas disponibles para comparar")
-
-columnas_disponibles = [
-    col for col in METRICAS_CONFIG.keys() if col in df_filtrado.columns
-]
-df_columnas = pd.DataFrame(
-    {
-        "Columna": columnas_disponibles,
-        "Métrica": [METRICAS_CONFIG[col]["nombre"] for col in columnas_disponibles],
-        "Unidad": [METRICAS_CONFIG[col]["unidad"] for col in columnas_disponibles],
-        "Límite": [
-            METRICAS_CONFIG[col]["limite_cumple"] for col in columnas_disponibles
-        ],
-        "Condición": [
-            METRICAS_CONFIG[col]["condicion"] for col in columnas_disponibles
-        ],
-    }
-)
-st.dataframe(df_columnas, use_container_width=True, hide_index=True)
-
-# ====================================================================
-# SELECCIÓN DE MÉTRICA
-# ====================================================================
-st.markdown("---")
-
 metricas_disponibles = [
     col for col in METRICAS_CONFIG.keys() if col in df_filtrado.columns
 ]
-
 if not metricas_disponibles:
-    st.warning("⚠️ No hay métricas disponibles para graficar")
+    st.warning(
+        "⚠️ No hay métricas disponibles para graficar. Verifica que las columnas existan en el Excel."
+    )
     st.stop()
 
 col_metrica = st.selectbox(
@@ -263,8 +238,15 @@ col_metrica = st.selectbox(
     format_func=lambda x: f"{METRICAS_CONFIG[x]['nombre']} ({METRICAS_CONFIG[x]['columna']})",
     key="metrica_principal",
 )
-
 config = METRICAS_CONFIG[col_metrica]
+
+# ---- DEPURACIÓN: Mostrar datos de la métrica (opcional) ----
+with st.expander("🔍 Debug - Datos de la métrica seleccionada", expanded=False):
+    st.write(f"**Columna:** `{col_metrica}`")
+    st.write(f"**Datos (primeras 5 filas):**")
+    st.dataframe(df_filtrado[[col_metrica]].head())
+    st.write(f"**Estadísticas:**")
+    st.write(df_filtrado[col_metrica].describe())
 
 # ====================================================================
 # GRÁFICA 1: POR DOCENTE
@@ -273,7 +255,6 @@ with st.expander(
     f"👨‍🏫 Comparación por Docente - {config['nombre']} (columna: {config['columna']})",
     expanded=True,
 ):
-
     st.markdown(f"""
     **📌 Columna en Excel:** `{config['columna']}`  
     **📌 ¿Qué mide?** {config['que_mide']}  
@@ -299,7 +280,6 @@ with st.expander(
             )
             total = len(datos_docentes)
             no_cumple = total - cumple_count
-
             if cumple_count == 0:
                 st.warning(
                     f"⚠️ **Ningún docente cumple** con la condición ({no_cumple} de {total} por debajo del límite)"
@@ -328,7 +308,6 @@ with st.expander(
                     col_metrica: f"{config['nombre']} ({config['unidad']})",
                 },
             )
-
             fig.add_hline(
                 y=config["limite_cumple"],
                 line_dash="dash",
@@ -337,11 +316,10 @@ with st.expander(
                 annotation_text=f"Límite: {config['limite_cumple']}",
                 annotation_position="top right",
             )
-
             fig.update_traces(textposition="outside")
             fig.update_layout(
                 template="plotly_white",
-                height=altura(),  # <--- USANDO altura()
+                height=altura(),
                 showlegend=False,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
@@ -350,10 +328,11 @@ with st.expander(
                 yaxis=dict(showgrid=True, gridcolor="lightgray"),
                 margin=dict(l=50, r=50, t=80, b=50),
             )
-
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("⚠️ No hay datos de docentes para mostrar")
+    else:
+        st.warning("⚠️ Columna 'nombres_apellidos' no encontrada")
 
 # ====================================================================
 # GRÁFICA 2: POR ÁREA
@@ -362,7 +341,6 @@ with st.expander(
     f"📚 Comparación por Área - {config['nombre']} (columna: {config['columna']})",
     expanded=False,
 ):
-
     st.markdown(f"""
     **📌 Columna en Excel:** `{config['columna']}`  
     **📌 ¿Qué mide?** {config['que_mide']}  
@@ -386,7 +364,6 @@ with st.expander(
             )
             total = len(datos_areas)
             no_cumple = total - cumple_count
-
             if cumple_count == 0:
                 st.warning(
                     f"⚠️ **Ningún área cumple** con la condición ({no_cumple} de {total} por debajo del límite)"
@@ -415,7 +392,6 @@ with st.expander(
                     col_metrica: f"{config['nombre']} ({config['unidad']})",
                 },
             )
-
             fig.add_hline(
                 y=config["limite_cumple"],
                 line_dash="dash",
@@ -424,11 +400,10 @@ with st.expander(
                 annotation_text=f"Límite: {config['limite_cumple']}",
                 annotation_position="top right",
             )
-
             fig.update_traces(textposition="outside")
             fig.update_layout(
                 template="plotly_white",
-                height=altura(),  # <--- USANDO altura()
+                height=altura(),
                 showlegend=False,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
@@ -437,10 +412,11 @@ with st.expander(
                 yaxis=dict(showgrid=True, gridcolor="lightgray"),
                 margin=dict(l=50, r=50, t=80, b=50),
             )
-
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("⚠️ No hay datos de áreas para mostrar")
+    else:
+        st.warning("⚠️ Columna 'area' no encontrada")
 
 # ====================================================================
 # GRÁFICA 3: POR MATERIA
@@ -449,7 +425,6 @@ with st.expander(
     f"📖 Comparación por Materia - {config['nombre']} (columna: {config['columna']})",
     expanded=False,
 ):
-
     st.markdown(f"""
     **📌 Columna en Excel:** `{config['columna']}`  
     **📌 ¿Qué mide?** {config['que_mide']}  
@@ -479,7 +454,6 @@ with st.expander(
             )
             total = len(datos_materias)
             no_cumple = total - cumple_count
-
             if cumple_count == 0:
                 st.warning(
                     f"⚠️ **Ninguna materia cumple** con la condición ({no_cumple} de {total} por debajo del límite)"
@@ -508,7 +482,6 @@ with st.expander(
                     col_metrica: f"{config['nombre']} ({config['unidad']})",
                 },
             )
-
             fig.add_hline(
                 y=config["limite_cumple"],
                 line_dash="dash",
@@ -517,11 +490,10 @@ with st.expander(
                 annotation_text=f"Límite: {config['limite_cumple']}",
                 annotation_position="top right",
             )
-
             fig.update_traces(textposition="outside")
             fig.update_layout(
                 template="plotly_white",
-                height=altura(),  # <--- USANDO altura()
+                height=altura(),
                 showlegend=False,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
@@ -530,7 +502,8 @@ with st.expander(
                 yaxis=dict(showgrid=True, gridcolor="lightgray"),
                 margin=dict(l=50, r=50, t=80, b=50),
             )
-
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("⚠️ No hay datos de materias para mostrar")
+    else:
+        st.warning("⚠️ Columna 'nom_materia' no encontrada")

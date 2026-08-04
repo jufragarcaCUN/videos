@@ -36,8 +36,7 @@ def main(df_filtrado=None):
     with st.expander(
         "📊 Diccionario de Métricas - ¿Qué mide cada modelo?", expanded=True
     ):
-        st.markdown(
-            """
+        st.markdown("""
         ### 📋 Cada métrica mide un aspecto diferente de la clase:
 
         ---
@@ -51,21 +50,14 @@ def main(df_filtrado=None):
 
         ---
 
-        **📌 TPT - Tiempo sobre Transiciones**  
-        *"¿Cuánto tiempo permanece estática cada escena?"*  
-        Mide la **duración promedio (en segundos) de una misma toma o diapositiva** en pantalla.  
-        • **Rango:** 1.0 a 60.0+ segundos  
-        🟢 **Bueno:** 1.0 - 3.3 segundos (ritmo ágil, mantiene atención activa)  
-        🔴 **Malo:** > 6.0 segundos (pantalla fija prolongada, genera fatiga visual)
-
         ---
 
         **📌 DME_s - Duración del Monólogo**  
         *"¿El profesor habla mucho tiempo seguido sin pausar?"*  
         Mide el **tiempo continuo máximo de voz activa sin pausas**.  
         • **Rango:** 0.0 a 120.0+ segundos  
-        🟢 **Bueno:** < 3.5 segundos (ritmo dinámico, pausas e interacción)  
-        🔴 **Malo:** > 40.0 - 100.0 segundos (monólogo largo y aburrido)
+        🟢 **Bueno:** < 3.5   
+        🔴 **Malo:** > 3.5 
 
         ---
 
@@ -129,15 +121,13 @@ def main(df_filtrado=None):
         • **Rango:** 0% a 100%  
         🟢 **Bueno:** > 50% (alta confianza en la clasificación)  
         🔴 **Malo:** < 50% (baja confianza, predicción incierta)
-        """
-        )
+        """)
 
     # ====================================================================
     # GUÍA DE INTERPRETACIÓN DE GRÁFICOS
     # ====================================================================
     with st.expander("📈 ¿Cómo interpretar los gráficos?", expanded=True):
-        st.markdown(
-            """
+        st.markdown("""
         ### 🎯 Cada gráfico en el dashboard responde preguntas específicas:
 
         ---
@@ -175,15 +165,13 @@ def main(df_filtrado=None):
         - Explicación de cada métrica
         - Guía de interpretación de gráficos
         - Resumen del dashboard
-        """
-        )
+        """)
 
     # ====================================================================
     # GUÍA DE NAVEGACIÓN
     # ====================================================================
     with st.expander("🧭 ¿Cómo navegar el dashboard?", expanded=True):
-        st.markdown(
-            """
+        st.markdown("""
         ### 📌 Pestañas disponibles:
 
         | Pestaña | ¿Qué encontrarás? | ¿Para qué sirve? |
@@ -202,15 +190,13 @@ def main(df_filtrado=None):
         | **📖 Materia** | Sidebar izquierdo | Filtra por materia específica |
         | **🎯 Clase Predicha** | Cuerpo de la página | Filtra por ENTRETENIDO/ABURRIDO |
         | **👔 Estado Docente** | Cuerpo de la página | Filtra por estado del docente |
-        """
-        )
+        """)
 
     # ====================================================================
     # SOBRE EL DASHBOARD
     # ====================================================================
     with st.expander("👥 Sobre este dashboard", expanded=False):
-        st.markdown(
-            """
+        st.markdown("""
         ### Dashboard Estratégico de Grabaciones Académicas
 
         **Desarrollado por:** Inteligencia Académica CUN  
@@ -225,8 +211,7 @@ def main(df_filtrado=None):
 
         ### Objetivo:
         *"Transformar datos en insights accionables para mejorar la calidad académica."*
-        """
-        )
+        """)
 
 
 if __name__ == "__main__":
