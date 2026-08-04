@@ -1189,6 +1189,56 @@ def main():
                 "⚠️ No hay métricas disponibles o no existe la columna 'Clase_Predicha'."
             )
 
+    # ================================================================
+    # 📋 TABLA DE RECOMENDACIONES (NUEVA)
+    # ================================================================
+    with st.expander("📋 Tabla de recomendaciones por docente", expanded=True):
+        mostrar_tabla_recomendaciones()
+
+
+def mostrar_tabla_recomendaciones():
+    """
+    Muestra una tabla con las columnas 'nombres_apellidos' y 'recomen_falencia'
+    a partir de los datos filtrados en session_state. Incluye botón de descarga CSV.
+    """
+    # Obtener los datos ya filtrados (desde el sidebar)
+    df = get_filtrado_data()
+
+    # Verificar que existan las columnas necesarias
+    columnas_requeridas = ["nombres_apellidos", "recomen_falencia"]
+    for col in columnas_requeridas:
+        if col not in df.columns:
+            st.error(f"❌ La columna '{col}' no existe en los datos filtrados.")
+            return
+
+    # Crear el DataFrame con solo esas dos columnas
+    df_tabla = df[columnas_requeridas].copy()
+
+    # Mostrar el título y cantidad de registros
+    st.subheader("📋 Tabla de Recomendaciones por Docente")
+    st.info(f"📊 Mostrando {len(df_tabla)} registros con los filtros aplicados")
+
+    # Mostrar la tabla interactiva
+    st.dataframe(
+        df_tabla,
+        column_config={
+            "nombres_apellidos": "Docente",
+            "recomen_falencia": "Recomendación",
+        },
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    # Botón para descargar CSV (para imprimir o guardar)
+    csv = df_tabla.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="📥 Descargar CSV (para imprimir)",
+        data=csv,
+        file_name="recomendaciones_docentes.csv",
+        mime="text/csv",
+        help="Descarga el archivo CSV que puedes abrir en Excel o imprimir.",
+    )
+
 
 # ================================================================
 # EJECUCIÓN
