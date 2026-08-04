@@ -41,17 +41,6 @@ def main(df_filtrado=None):
 
         ---
 
-        **📌 CPM - Cortes por Minuto**  
-        *"¿Qué tan editado y variado está el video?"*  
-        Mide la **frecuencia de cortes visuales o transiciones** por cada 60 segundos.  
-        • **Rango:** 0.0 a 30.0+ cortes/min  
-        🟢 **Bueno:** > 18.0 (clase dinámica, bien editada)  
-        🔴 **Malo:** < 3.0 - 5.0 (clase plana, sin ediciones ni cambios visuales)
-
-        ---
-
-        ---
-
         **📌 DME_s - Duración del Monólogo**  
         *"¿El profesor habla mucho tiempo seguido sin pausar?"*  
         Mide el **tiempo continuo máximo de voz activa sin pausas**.  
@@ -114,13 +103,6 @@ def main(df_filtrado=None):
         🔴 **Malo:** < 0.4 (video inestable, dificulta la visualización)
 
         ---
-
-        **📌 Porcentaje_Certeza - Certeza del algoritmo**  
-        *"¿Qué tan seguro está el algoritmo de su clasificación?"*  
-        Mide la **probabilidad y confianza en la predicción del modelo**.  
-        • **Rango:** 0% a 100%  
-        🟢 **Bueno:** > 50% (alta confianza en la clasificación)  
-        🔴 **Malo:** < 50% (baja confianza, predicción incierta)
         """)
 
     # ====================================================================
@@ -150,13 +132,6 @@ def main(df_filtrado=None):
         - **Perfil de Docentes**: barras que muestran el desempeño de cada docente
         - **Distribución de Clases**: compara ENTRETENIDO vs ABURRIDO
         - **Correlación**: muestra qué métrica predice mejor la clasificación
-
-        ---
-
-        **📋 Verificación**  
-        *"¿Los datos cargaron correctamente?"*  
-        - Muestra los datos **TAL CUAL** están en el Excel
-        - Verifica los valores reales de cada métrica
 
         ---
 
