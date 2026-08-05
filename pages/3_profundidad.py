@@ -437,6 +437,7 @@ def main():
     # ================================================================
     # ➕ AÑADIR COLUMNAS DE CUMPLIMIENTO (en %)
     # ================================================================
+    # --> Línea para calcular los porcentajes de cumplimiento
     for col in metricas_disp:
         config = METRICAS_CONFIG[col]
         df_filtrado[f"{col}_cumplimiento"] = df_filtrado[col].apply(
@@ -615,6 +616,7 @@ def main():
 
             col_cumplimiento = f"{metrica_heatmap}_cumplimiento"
 
+            # --> Línea para calcular los porcentajes de cumplimiento
             df_heatmap = df_filtrado.pivot_table(
                 index="nombres_apellidos",
                 columns="area",
@@ -638,13 +640,29 @@ def main():
                 and len(df_heatmap.columns) > 0
             ):
 
+                # >>> Línea que pone el top 10 para que el mapa no se vea tan grande
+                # Top 10 docentes con mejor promedio
+                df_heatmap["promedio"] = df_heatmap.mean(axis=1)
+                df_heatmap = df_heatmap.sort_values("promedio", ascending=False)
+                top_docentes = df_heatmap.head(10).index
+                df_heatmap = df_heatmap.loc[top_docentes]
+                df_heatmap = df_heatmap.drop(columns=["promedio"])
+
+                # Top 10 programas con mejor promedio
+                promedios_programas = df_heatmap.mean(axis=0).sort_values(
+                    ascending=False
+                )
+                top_programas = promedios_programas.head(10).index
+                df_heatmap = df_heatmap[top_programas]
+
+                # Ordenar docentes de mejor a peor
                 df_heatmap["promedio"] = df_heatmap.mean(axis=1)
                 df_heatmap = df_heatmap.sort_values("promedio", ascending=False)
                 df_heatmap = df_heatmap.drop(columns=["promedio"])
 
                 fig_heatmap = px.imshow(
                     df_heatmap,
-                    title=f"Mapa de Calor: % de Cumplimiento de {METRICAS_CONFIG[metrica_heatmap]['nombre']} por Docente y Programa",
+                    title=f"Mapa de Calor: % de Cumplimiento de {METRICAS_CONFIG[metrica_heatmap]['nombre']} por Docente y Programa (Top 10)",
                     color_continuous_scale="RdYlGn",
                     aspect="auto",
                     text_auto=True,
@@ -700,7 +718,7 @@ def main():
                     max_cell = min_cell = 0
                     max_docente = max_programa = min_docente = min_programa = "N/A"
 
-                que_muestra = f"Este mapa de calor muestra el cumplimiento de {len(df_heatmap)} docentes en {len(df_heatmap.columns)} programas, medido por {METRICAS_CONFIG[metrica_heatmap]['nombre']}. Los colores VERDES indican alto cumplimiento (≥70%) y ROJOS bajo cumplimiento (<70%)."
+                que_muestra = f"Este mapa de calor muestra el cumplimiento de los TOP 10 docentes en los TOP 10 programas, medido por {METRICAS_CONFIG[metrica_heatmap]['nombre']}. Los colores VERDES indican alto cumplimiento (≥70%) y ROJOS bajo cumplimiento (<70%)."
 
                 if max_docente != "N/A":
                     que_muestra += f" El mejor cumplimiento es de {max_docente} en {max_programa} con {max_cell:.1f}%. El peor es {min_docente} en {min_programa} con {min_cell:.1f}%."
@@ -711,7 +729,7 @@ def main():
                 if mejor_programa != "N/A":
                     que_muestra += f" {mejor_programa} es el programa con mejor cumplimiento y {peor_programa} el de menor."
 
-                como_leer = f"🔹 Cada FILA = un docente.\n🔹 Cada COLUMNA = un programa.\n🔹 COLOR:\n   🟢 Verde = alto cumplimiento (≥70%)\n   🟡 Amarillo = cumplimiento medio (40-70%)\n   🔴 Rojo = bajo cumplimiento (<40%)\n🔹 Docentes ordenados de mejor a peor promedio (arriba = mejores)."
+                como_leer = f"🔹 Cada FILA = un docente (Top 10).\n🔹 Cada COLUMNA = un programa (Top 10).\n🔹 COLOR:\n   🟢 Verde = alto cumplimiento (≥70%)\n   🟡 Amarillo = cumplimiento medio (40-70%)\n   🔴 Rojo = bajo cumplimiento (<40%)\n🔹 Docentes ordenados de mejor a peor promedio (arriba = mejores)."
 
                 que_buscar = f"🎯 Busca:\n🔹 Filas VERDES completas → docentes excelentes en todo.\n🔹 Columnas VERDES completas → programas con buen cumplimiento.\n🔹 Celdas ROJAS → áreas de mejora específicas."
 
@@ -725,7 +743,7 @@ def main():
                     )
 
                 mostrar_interpretacion_grafica(
-                    f"Cómo interpretar el Mapa de Calor de Cumplimiento de {METRICAS_CONFIG[metrica_heatmap]['nombre']} por Docente y Programa",
+                    f"Cómo interpretar el Mapa de Calor de Cumplimiento de {METRICAS_CONFIG[metrica_heatmap]['nombre']} por Docente y Programa (Top 10)",
                     que_muestra,
                     como_leer,
                     que_buscar,
@@ -1139,9 +1157,41 @@ def mostrar_tabla_recomendaciones():
 
     # Mostrar el título y cantidad de registros
     st.subheader("📋 Tabla de Recomendaciones por Docente")
-    st.info(f"📊 Mostrando {len(df_tabla)} registros con los filtros aplicados")
 
-    # Mostrar la tabla interactiva
+    # ================================================================
+    # 📌 SELECTBOX PARA FILTRAR POR DOCENTE
+    # ================================================================
+    # Obtener lista de docentes únicos ordenados alfabéticamente
+    docentes_disponibles = sorted(df_tabla["nombres_apellidos"].dropna().unique())
+
+    if len(docentes_disponibles) > 0:
+        # Crear dos columnas para el filtro
+        col_filtro1, col_filtro2 = st.columns([1, 3])
+
+        with col_filtro1:
+            # 🔽 AQUÍ ESTÁ EL SELECTBOX 🔽
+            opcion_docente = st.selectbox(
+                "👨‍🏫 Filtrar por docente:",
+                options=["Todos"] + docentes_disponibles,
+                key="filtro_docente_recomendaciones",
+            )
+            # 🔼 AQUÍ TERMINA EL SELECTBOX 🔼
+
+        # Aplicar filtro según lo seleccionado en el selectbox
+        if opcion_docente != "Todos":
+            # Filtrar el DataFrame para mostrar solo el docente seleccionado
+            df_tabla = df_tabla[df_tabla["nombres_apellidos"] == opcion_docente]
+            st.success(f"✅ Mostrando recomendaciones de: **{opcion_docente}**")
+        else:
+            st.info(f"📊 Mostrando todos los docentes ({len(df_tabla)} registros)")
+    else:
+        st.warning("⚠️ No hay docentes disponibles para filtrar.")
+
+    # ================================================================
+    # FIN DEL SELECTBOX
+    # ================================================================
+
+    # Mostrar la tabla interactiva con los datos filtrados
     st.dataframe(
         df_tabla,
         column_config={
