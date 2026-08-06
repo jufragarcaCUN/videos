@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -25,16 +26,37 @@ st.markdown(
 )
 
 
+def mostrar_archivos_en_sidebar(ruta_carpeta):
+    """Muestra el contenido de la carpeta en un desplegable dentro del Sidebar."""
+    try:
+        if os.path.exists(ruta_carpeta):
+            elementos = os.listdir(ruta_carpeta)
+            with st.sidebar.expander("📂 Archivos en el directorio", expanded=False):
+                for elem in elementos:
+                    # Ignorar archivos temporales de Excel
+                    if elem.startswith("~$"):
+                        continue
+
+                    ruta_completa = os.path.join(ruta_carpeta, elem)
+                    if os.path.isfile(ruta_completa):
+                        st.text(f"📄 {elem}")
+                    elif os.path.isdir(ruta_completa):
+                        st.text(f"📁 {elem}")
+    except Exception as e:
+        st.sidebar.error(f"Error al listar carpeta: {e}")
+
+
 @st.cache_data
 def load_data():
     try:
-        excel_path = Path(__file__).parent / "tabla_23_julio.xlsx"
+        # Corrección del nombre del archivo a 'exel_salida.xlsx'
+        excel_path = Path(__file__).parent / "exel_entrada.xlsx"
+
         if not excel_path.exists():
             st.error(f"❌ No se encontró el archivo Excel en: {excel_path}")
             return None
 
         df = pd.read_excel(excel_path)
-        st.write(df.columns.tolist())
 
         multi_value_cols = [
             "grupo",
@@ -126,6 +148,10 @@ def render_sidebar_filters(df):
 
 
 def main():
+    # Muestra los archivos en el menú lateral de Streamlit
+    ruta = Path(__file__).parent
+    mostrar_archivos_en_sidebar(ruta)
+
     df = load_data()
     if df is None:
         st.stop()
@@ -137,7 +163,7 @@ def main():
 
     pg = st.navigation({"Informes": [p_presentacion, p_general, p_profundidad]})
 
-    # 2. RENDERIZAR FILTROS (Importante: Se renderizan justo antes de correr la navegación)
+    # 2. Renderizar Filtros
     render_sidebar_filters(df)
 
     # 3. Ejecutar la vista de la página actual

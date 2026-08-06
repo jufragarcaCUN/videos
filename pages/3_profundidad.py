@@ -12,27 +12,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # ================================================================
-# 🔥 OBTENER DATOS FILTRADOS DEL SESSION_STATE
-# ================================================================
-
-
-def get_filtrado_data():
-    """Obtiene los datos filtrados del session_state"""
-    if "df_filtrado" not in st.session_state:
-        st.error("❌ No hay datos filtrados. Regresa a la página principal.")
-        st.stop()
-
-    df = st.session_state["df_filtrado"]
-
-    if df is None or df.empty:
-        st.warning("⚠️ No hay datos con los filtros seleccionados.")
-        st.stop()
-
-    return df
-
-
-# ================================================================
-# CONFIGURACIÓN DE MÉTRICAS (SIN Porcentaje_Certeza)
+# CONFIGURACIÓN DE MÉTRICAS
 # ================================================================
 
 METRICAS_CONFIG = {
@@ -107,61 +87,45 @@ METRICAS_CONFIG = {
         "limite_cumple": 0.15,
         "condicion": "mayor",
     },
-    # "Porcentaje_Certeza": {   # ELIMINADA
-    #     "nombre": "Certeza",
-    #     "columna": "Porcentaje_Certeza",
-    #     "unidad": "%",
-    #     "formato": "{:.1f}%",
-    #     "tipo": "mayor",
-    #     "meta": 50.0,
-    #     "limite_cumple": 50,
-    #     "condicion": "mayor",
-    # },
 }
 
 # ================================================================
-# FUNCIONES AUXILIARES PARA CÁLCULO DE CUMPLIMIENTO
+# FUNCIONES AUXILIARES
 # ================================================================
 
 
 def calcular_cumplimiento(valor, config):
-    """Calcula el porcentaje de cumplimiento según el tipo de métrica"""
+    """Calcula el porcentaje de cumplimiento"""
     if pd.isna(valor):
         return 0.0
 
     tipo = config.get("tipo")
-    if tipo == "mayor":
-        meta = config.get("meta")
-        if meta is None or meta == 0:
-            return 0.0
-        if valor >= meta:
-            return 100.0
-        else:
+    meta = config.get("meta")
+
+    if meta is None:
+        return 0.0
+
+    try:
+        if tipo == "mayor":
+            if meta == 0:
+                return 0.0
             return min((valor / meta) * 100, 100.0)
-
-    elif tipo == "menor":
-        meta = config.get("meta")
-        if meta is None or meta == 0 or valor == 0:
-            return 0.0
-        if valor <= meta:
-            return 100.0
-        else:
-            return min((meta / valor) * 100, 100.0)
-
-    elif tipo == "rango":
-        min_val = config.get("min", 0)
-        max_val = config.get("max", float("inf"))
-        if min_val <= valor <= max_val:
-            return 100.0
-        else:
-            return 0.0
-
-    else:
+        elif tipo == "menor":
+            if meta == 0:
+                return 0.0
+            if valor <= meta:
+                return 100.0
+            return max(0.0, min((meta / valor) * 100, 100.0))
+        elif tipo == "rango":
+            min_val = config.get("min", 0)
+            max_val = config.get("max", float("inf"))
+            return 100.0 if min_val <= valor <= max_val else 0.0
+        return 0.0
+    except:
         return 0.0
 
 
 def obtener_estado(pct):
-    """Devuelve el estado según el porcentaje de cumplimiento"""
     if pct >= 100:
         return "✅ Cumple"
     elif pct >= 70:
@@ -170,29 +134,32 @@ def obtener_estado(pct):
         return "❌ Requiere mejora"
 
 
-# ================================================================
-# FUNCIÓN VERIFICAR CUMPLIMIENTO (para compatibilidad)
-# ================================================================
+@st.cache_data
+def agregar_columnas_cumplimiento(_df, metricas_disp):
+    """Agrega columnas de cumplimiento al DataFrame"""
+    df_resultado = _df.copy()
+    for col in metricas_disp:
+        config = METRICAS_CONFIG[col]
+        col_cumplimiento = f"{col}_cumplimiento"
+        if col in df_resultado.columns and col_cumplimiento not in df_resultado.columns:
+            df_resultado[col_cumplimiento] = df_resultado[col].apply(
+                lambda x: calcular_cumplimiento(x, config)
+            )
+    return df_resultado
 
 
-def verificar_cumplimiento(valor, limite, condicion):
-    """Función original para las gráficas 2, 3, 5, 6, 7 (ya no se usa pero se mantiene)"""
-    if limite is None or condicion is None:
-        return None
-    if condicion == "mayor":
-        return valor > limite
-    elif condicion == "menor":
-        return valor < limite
-    elif condicion == "menor_igual":
-        return valor <= limite
-    elif condicion == "mayor_igual":
-        return valor >= limite
-    return None
+def get_filtrado_data():
+    """Obtiene los datos filtrados del session_state"""
+    if "df_filtrado" not in st.session_state:
+        st.error("❌ No hay datos filtrados. Regresa a la página principal.")
+        st.stop()
 
+    df = st.session_state["df_filtrado"]
+    if df is None or df.empty:
+        st.warning("⚠️ No hay datos con los filtros seleccionados.")
+        st.stop()
 
-# ================================================================
-# FUNCIONES DE VISUALIZACIÓN
-# ================================================================
+    return df
 
 
 def mostrar_leyenda_grafica(titulo, pregunta, interpretacion):
@@ -216,123 +183,81 @@ def mostrar_interpretacion_grafica(titulo, que_muestra, como_leer, que_buscar):
     with st.container():
         st.markdown("---")
         st.markdown(f"### 📖 {titulo}")
-
-        with st.container():
-            st.markdown("#### 🔍 ¿Qué muestra esta gráfica?")
-            st.info(que_muestra)
-
-        with st.container():
-            st.markdown("#### 📊 ¿Cómo se lee?")
-            st.success(como_leer)
-
-        with st.container():
-            st.markdown("#### 🎯 ¿Qué debes buscar?")
-            st.warning(que_buscar)
-
+        st.info(que_muestra)
+        st.success(como_leer)
+        st.warning(que_buscar)
         st.markdown("---")
 
 
-def mostrar_tabla_metricas():
-    """Muestra la tabla de métricas con definiciones, cómo se miden y rangos"""
+def mostrar_diccionario_metricas():
+    """Muestra el diccionario completo de métricas con explicaciones"""
+    st.markdown("### 📊 Diccionario de Métricas - ¿Qué estamos midiendo?")
 
-    st.markdown("### 📋 Diccionario de Métricas")
-    st.markdown(
-        """
-    <div style="background: #f0f2f6; padding: 15px; border-radius: 10px; margin: 10px 0; border-left: 5px solid #2e7d32;">
-        <p style="margin: 0; font-size: 0.9rem;">
-            <strong>📖 ¿Qué significan estas métricas?</strong> Estas métricas evalúan la calidad de las grabaciones de clase.
-            Cada métrica mide un aspecto diferente del desempeño del docente: fluidez, energía, movimiento, estabilidad vocal, etc.
-        </p>
-    </div>
-    """,
-        unsafe_allow_html=True,
-    )
-
-    data = [
+    metricas_data = [
         {
-            "Métrica": "Duración del monólogo",
-            "Columna": "DME_s",
-            "¿Qué mide?": "Tiempo promedio que el docente habla sin interrupción. Mide la capacidad de mantener la atención del estudiante.",
-            "¿Cómo se mide?": "Se calcula el promedio de los segmentos de habla continua del docente.",
-            "Unidad": "segundos",
-            "Meta": "< 3.5",
-            "Tipo": "Menor es mejor",
+            "Métrica": "Duración del monólogo (DME_s)",
+            "Qué mide": "Tiempo que el docente habla sin interrupción. Mide su capacidad de mantener la atención y fluidez.",
+            "Meta": "< 3.5 segundos",
+            "Interpretación": "Valores bajos indican que el docente habla en segmentos cortos, manteniendo la atención del estudiante.",
         },
         {
-            "Métrica": "Porcentaje de habla",
-            "Columna": "DTE_ratio",
-            "¿Qué mide?": "Relación entre el tiempo que habla el docente y el tiempo total de la grabación.",
-            "¿Cómo se mide?": "Tiempo hablado por el docente / duración total de la grabación.",
-            "Unidad": "adimensional",
-            "Meta": "≤ 0.5",
-            "Tipo": "Rango (0.0 - 0.5)",
+            "Métrica": "Porcentaje de habla (DTE_ratio)",
+            "Qué mide": "Relación entre el tiempo que habla el docente y el tiempo total de la clase.",
+            "Meta": "≤ 0.5 (máximo 50%)",
+            "Interpretación": "Valores bajos indican que el docente no domina la conversación, permitiendo participación del estudiante.",
         },
         {
-            "Métrica": "Estabilidad técnica",
-            "Columna": "Jitter_Score",
-            "¿Qué mide?": "Estabilidad de la voz del docente. Mide fluidez y naturalidad del discurso.",
-            "¿Cómo se mide?": "Variación de la frecuencia fundamental de la voz. Valores más altos = mayor estabilidad.",
-            "Unidad": "adimensional",
+            "Métrica": "Estabilidad técnica (Jitter_Score)",
+            "Qué mide": "Estabilidad y naturalidad de la voz del docente. Fluidez del discurso.",
             "Meta": "> 0.4",
-            "Tipo": "Mayor es mejor",
+            "Interpretación": "Valores altos indican una voz estable y natural, sin tartamudeos ni vacilaciones.",
         },
         {
-            "Métrica": "Movimiento promedio",
-            "Columna": "IMP_promedio",
-            "¿Qué mide?": "Cantidad de movimiento corporal del docente. Mide dinamismo y energía en la clase.",
-            "¿Cómo se mide?": "Se calcula el promedio de movimiento del docente a través de la grabación.",
-            "Unidad": "adimensional",
+            "Métrica": "Movimiento promedio (IMP_promedio)",
+            "Qué mide": "Cantidad de movimiento corporal del docente durante la clase.",
             "Meta": "> 4.0",
-            "Tipo": "Mayor es mejor",
+            "Interpretación": "Valores altos indican un docente dinámico que usa el espacio y el movimiento para mantener la atención.",
         },
         {
-            "Métrica": "Cambios de movimiento",
-            "Columna": "sigma2_IM",
-            "¿Qué mide?": "Variación en el movimiento corporal. Mide consistencia y ritmo del docente.",
-            "¿Cómo se mide?": "Desviación estándar del movimiento a lo largo de la grabación.",
-            "Unidad": "adimensional",
+            "Métrica": "Cambios de movimiento (sigma2_IM)",
+            "Qué mide": "Variación y consistencia del movimiento corporal del docente.",
             "Meta": "> 8.5",
-            "Tipo": "Mayor es mejor",
+            "Interpretación": "Valores altos indican variedad en los movimientos, evitando la monotonía.",
         },
         {
-            "Métrica": "Variación de la voz",
-            "Columna": "Tone_CoV",
-            "¿Qué mide?": "Variación del tono de voz del docente. Mide expresividad y capacidad de mantener el interés.",
-            "¿Cómo se mide?": "Coeficiente de variación del tono a lo largo de la grabación.",
-            "Unidad": "adimensional",
+            "Métrica": "Variación de la voz (Tone_CoV)",
+            "Qué mide": "Variación del tono y expresividad vocal del docente.",
             "Meta": "> 0.32",
-            "Tipo": "Mayor es mejor",
+            "Interpretación": "Valores altos indican una voz expresiva que mantiene el interés del estudiante.",
         },
         {
-            "Métrica": "Nivel de energía",
-            "Columna": "Enthusiasm_Score",
-            "¿Qué mide?": "Nivel de entusiasmo y energía del docente. Mide engagement con los estudiantes.",
-            "¿Cómo se mide?": "Algoritmo de análisis de audio que detecta patrones de entusiasmo en la voz.",
-            "Unidad": "adimensional",
+            "Métrica": "Nivel de energía (Enthusiasm_Score)",
+            "Qué mide": "Nivel de entusiasmo y energía vocal del docente.",
             "Meta": "> 0.15",
-            "Tipo": "Mayor es mejor",
+            "Interpretación": "Valores altos indican un docente energético que transmite pasión por el tema.",
+        },
+        {
+            "Métrica": "Clase Predicha",
+            "Qué mide": "Clasificación de la clase como ENTRETENIDO o ABURRIDO.",
+            "Meta": "ENTRETENIDO",
+            "Interpretación": "Clases clasificadas como ENTRETENIDO son las que tienen mejor desempeño en todas las métricas.",
         },
     ]
 
-    df_metricas = pd.DataFrame(data)
-
+    df_metricas = pd.DataFrame(metricas_data)
     st.dataframe(
         df_metricas,
         column_config={
-            "Métrica": st.column_config.TextColumn("Métrica", width="medium"),
-            "Columna": st.column_config.TextColumn("Columna", width="small"),
-            "¿Qué mide?": st.column_config.TextColumn("¿Qué mide?", width="large"),
-            "¿Cómo se mide?": st.column_config.TextColumn(
-                "¿Cómo se mide?", width="large"
+            "Métrica": st.column_config.TextColumn("📊 Métrica", width="medium"),
+            "Qué mide": st.column_config.TextColumn("🔍 ¿Qué mide?", width="large"),
+            "Meta": st.column_config.TextColumn("🎯 Meta", width="small"),
+            "Interpretación": st.column_config.TextColumn(
+                "💡 Interpretación", width="large"
             ),
-            "Unidad": st.column_config.TextColumn("Unidad", width="small"),
-            "Meta": st.column_config.TextColumn("Meta", width="small"),
-            "Tipo": st.column_config.TextColumn("Tipo", width="medium"),
         },
         hide_index=True,
         use_container_width=True,
     )
-
     st.markdown("---")
 
 
@@ -342,119 +267,48 @@ def mostrar_tabla_metricas():
 
 
 def main():
-    """Función principal que muestra todas las gráficas"""
-
     df_filtrado = get_filtrado_data()
 
     st.header("📈 Análisis Profundo - 6 Gráficas Interactivas")
 
-    # ================================================================
-    # 🆕 FILTRO DE CLASE (ENTRETENIDO / ABURRIDO)
-    # ================================================================
+    # Filtro de clase
     if "Clase_Predicha" in df_filtrado.columns:
-        clases_disponibles = sorted(df_filtrado["Clase_Predicha"].dropna().unique())
+        df_filtrado["Clase_Normalizada"] = df_filtrado["Clase_Predicha"].str.upper()
+        clases_disponibles = sorted(df_filtrado["Clase_Normalizada"].dropna().unique())
         if len(clases_disponibles) > 0:
             st.markdown("### 🎯 Filtrar por Clase")
-            col_filtro1, col_filtro2 = st.columns([1, 3])
-            with col_filtro1:
-                opcion_clase = st.selectbox(
-                    "Seleccionar clase:",
-                    options=["Todas"] + clases_disponibles,
-                    key="filtro_clase_profundidad",
-                )
+            opcion_clase = st.selectbox(
+                "Seleccionar clase:",
+                options=["Todas"] + clases_disponibles,
+                key="filtro_clase_profundidad",
+            )
             if opcion_clase != "Todas":
-                df_filtrado = df_filtrado[df_filtrado["Clase_Predicha"] == opcion_clase]
+                df_filtrado = df_filtrado[
+                    df_filtrado["Clase_Normalizada"] == opcion_clase
+                ]
                 st.success(f"✅ Mostrando solo clases: **{opcion_clase}**")
             else:
                 st.info("📊 Mostrando **todas** las clases")
-        else:
-            st.info("📊 No hay clases disponibles para filtrar.")
-    else:
-        st.warning("⚠️ La columna 'Clase_Predicha' no existe en los datos.")
 
     st.info(f"📊 Mostrando {len(df_filtrado)} registros con los filtros aplicados")
 
-    # ================================================================
-    # 📋 DICCIONARIO DE MÉTRICAS (visible por defecto)
-    # ================================================================
-    mostrar_tabla_metricas()
-
-    # ================================================================
-    # 📊 RESUMEN EJECUTIVO (con tarjetas de Aburridas/Entretenidas)
-    # ================================================================
-    st.subheader("📊 Resumen Ejecutivo")
-
-    # ---- Contar clases (BUSCANDO EN MAYÚSCULAS) ----
-    clases_counts = {}
-    if "Clase_Predicha" in df_filtrado.columns:
-        clases_counts = df_filtrado["Clase_Predicha"].value_counts().to_dict()
-        # 🔥 CAMBIO AQUÍ: buscamos "ABURRIDO" y "ENTRETENIDO" en mayúsculas
-        aburridos = clases_counts.get("ABURRIDO", 0)
-        entretenidos = clases_counts.get("ENTRETENIDO", 0)
-    else:
-        aburridos = 0
-        entretenidos = 0
-
-    # ---- Mostrar 6 tarjetas ----
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
-
-    with col1:
-        st.metric("Total Grabaciones", len(df_filtrado))
-
-    with col2:
-        total_docentes = (
-            df_filtrado["nombres_apellidos"].nunique()
-            if "nombres_apellidos" in df_filtrado.columns
-            else 0
-        )
-        st.metric("Total Docentes", total_docentes)
-
-    with col3:
-        total_programas = (
-            df_filtrado["area"].nunique() if "area" in df_filtrado.columns else 0
-        )
-        st.metric("Total Programas", total_programas)
-
-    with col4:
-        total_materias = (
-            df_filtrado["nom_materia"].nunique()
-            if "nom_materia" in df_filtrado.columns
-            else 0
-        )
-        st.metric("Total Materias", total_materias)
-
-    with col5:
-        st.metric("😴 Aburridas", aburridos)
-
-    with col6:
-        st.metric("🎉 Entretenidas", entretenidos)
-
-    # ---- Continuar con el resto del código ----
+    # Obtener métricas disponibles
     metricas_disp = [
         col for col in METRICAS_CONFIG.keys() if col in df_filtrado.columns
     ]
 
-    # ================================================================
-    # ➕ AÑADIR COLUMNAS DE CUMPLIMIENTO (en %)
-    # ================================================================
-    # --> Línea para calcular los porcentajes de cumplimiento
-    for col in metricas_disp:
-        config = METRICAS_CONFIG[col]
-        df_filtrado[f"{col}_cumplimiento"] = df_filtrado[col].apply(
-            lambda x: calcular_cumplimiento(x, config)
-        )
+    # Agregar columnas de cumplimiento
+    with st.spinner("🔄 Calculando métricas de cumplimiento..."):
+        df_filtrado = agregar_columnas_cumplimiento(df_filtrado, metricas_disp)
 
     # ================================================================
-    # GRÁFICA 1: Radar Chart basado en CUMPLIMIENTO
+    # GRÁFICA 1: Radar Chart
     # ================================================================
-    with st.expander(
-        "🕸️ Gráfica 1: Radar de Cumplimiento - Perfil del Docente vs Estándares",
-        expanded=True,
-    ):
+    with st.expander("🕸️ Gráfica 1: Radar de Cumplimiento", expanded=True):
         mostrar_leyenda_grafica(
             "Perfil de Cumplimiento del Docente",
-            "¿Qué indicadores cumple el docente según los estándares definidos? ¿Cuáles debe mejorar?",
-            "🔹 Cada eje representa el **% de cumplimiento** de una métrica.\n🔹 100% = cumple o supera la meta.\n🔹 70-99% = cerca de la meta (parcial).\n🔹 <70% = necesita mejora.\n🔹 El área sombreada muestra el perfil de cumplimiento del docente.",
+            "¿Qué indicadores cumple el docente según los estándares?",
+            "🔹 Cada eje = % de cumplimiento. 100% = cumple la meta.",
         )
 
         if "nombres_apellidos" in df_filtrado.columns and metricas_disp:
@@ -463,11 +317,11 @@ def main():
                 docente_seleccionado = st.selectbox(
                     "Seleccionar Docente", docentes, key="radar_docente"
                 )
+
                 df_docente = df_filtrado[
                     df_filtrado["nombres_apellidos"] == docente_seleccionado
                 ]
 
-                # Calcular promedios del docente para cada métrica
                 promedios_docente = {}
                 for col in metricas_disp:
                     if col in df_docente.columns:
@@ -475,18 +329,19 @@ def main():
                     else:
                         promedios_docente[col] = np.nan
 
-                # Construir tabla de evaluación
                 datos_tabla = []
                 nombres_metricas = []
                 valores_cumplimiento = []
+
                 for col in metricas_disp:
                     config = METRICAS_CONFIG[col]
                     valor = promedios_docente.get(col, np.nan)
                     if pd.isna(valor):
                         continue
+
                     pct = calcular_cumplimiento(valor, config)
                     estado = obtener_estado(pct)
-                    # Definir meta en texto
+
                     if config["tipo"] == "mayor":
                         meta_text = f"> {config['meta']}"
                     elif config["tipo"] == "menor":
@@ -495,12 +350,12 @@ def main():
                         meta_text = f"{config['min']} - {config['max']}"
                     else:
                         meta_text = "-"
+
                     datos_tabla.append(
                         {
                             "Indicador": config["nombre"],
                             "Valor": config["formato"].format(valor),
                             "Meta": meta_text,
-                            "Tipo": config["tipo"].capitalize(),
                             "% Cumplimiento": f"{pct:.1f}%",
                             "Estado": estado,
                         }
@@ -508,27 +363,11 @@ def main():
                     nombres_metricas.append(config["nombre"])
                     valores_cumplimiento.append(pct)
 
-                # Mostrar tabla de evaluación
                 if datos_tabla:
                     st.markdown(f"### 📊 Evaluación de {docente_seleccionado}")
                     df_tabla = pd.DataFrame(datos_tabla)
-                    st.dataframe(
-                        df_tabla,
-                        column_config={
-                            "Indicador": "Indicador",
-                            "Valor": "Valor",
-                            "Meta": "Meta",
-                            "Tipo": "Tipo",
-                            "% Cumplimiento": st.column_config.TextColumn(
-                                "% Cumplimiento"
-                            ),
-                            "Estado": st.column_config.TextColumn("Estado"),
-                        },
-                        hide_index=True,
-                        use_container_width=True,
-                    )
+                    st.dataframe(df_tabla, hide_index=True, use_container_width=True)
 
-                    # Radar de cumplimiento
                     fig_radar = go.Figure()
                     fig_radar.add_trace(
                         go.Scatterpolar(
@@ -547,58 +386,32 @@ def main():
                                 range=[0, 100],
                                 tickvals=[0, 25, 50, 75, 100],
                                 ticktext=["0%", "25%", "50%", "75%", "100%"],
-                            ),
-                            angularaxis=dict(tickfont=dict(size=10)),
+                            )
                         ),
                         title=f"Perfil de Cumplimiento de {docente_seleccionado}",
                         height=550,
                         template="plotly_white",
-                        showlegend=False,
                     )
                     st.plotly_chart(fig_radar, use_container_width=True)
 
-                    # Interpretación
-                    promedio_cumplimiento = np.mean(valores_cumplimiento)
-                    max_idx = np.argmax(valores_cumplimiento)
-                    min_idx = np.argmin(valores_cumplimiento)
-                    fortaleza = nombres_metricas[max_idx]
-                    debilidad = nombres_metricas[min_idx]
-                    cumple_count = sum(1 for p in valores_cumplimiento if p >= 100)
-                    total = len(valores_cumplimiento)
-
                     mostrar_interpretacion_grafica(
-                        f"Cómo interpretar el Radar de Cumplimiento de {docente_seleccionado}",
-                        f"Este radar muestra el cumplimiento de {docente_seleccionado} en {total} indicadores. "
-                        f"El promedio de cumplimiento es {promedio_cumplimiento:.1f}%. "
-                        f"Cumple {cumple_count} de {total} indicadores al 100%. "
-                        f"Su fortaleza es {fortaleza} ({valores_cumplimiento[max_idx]:.1f}%) "
-                        f"y su área de mejora es {debilidad} ({valores_cumplimiento[min_idx]:.1f}%).",
-                        f"🔹 Cada eje representa un indicador.\n"
-                        f"🔹 100% = cumple la meta (zona verde).\n"
-                        f"🔹 70-99% = se acerca a la meta (zona amarilla).\n"
-                        f"🔹 <70% = necesita mejora (zona roja).\n"
-                        f"🔹 El área sombreada muestra el perfil de cumplimiento.",
-                        f"🎯 Busca los ejes que llegan al 100% (cumple) y los que están por debajo (áreas de mejora). "
-                        f"Presta atención a {debilidad} que tiene el menor cumplimiento.",
+                        f"Perfil de Cumplimiento de {docente_seleccionado}",
+                        f"Cumple con {sum(1 for p in valores_cumplimiento if p >= 100)} de {len(valores_cumplimiento)} indicadores.",
+                        "🔹 100% = cumple la meta, <70% = necesita mejora.",
+                        "🎯 Busca los ejes que llegan al 100% y los que están por debajo.",
                     )
-                else:
-                    st.warning("⚠️ No hay datos de métricas para este docente.")
-            else:
-                st.warning("⚠️ No hay docentes en los datos filtrados.")
-        else:
-            st.warning("⚠️ No se encontraron las columnas necesarias para el radar.")
 
     # ================================================================
-    # GRÁFICA 2: Mapa de Calor - Cumplimiento por Docente y Programa
+    # GRÁFICA 2: Mapa de Calor (Top 10)
     # ================================================================
     with st.expander(
-        "🔥 Gráfica 2: Mapa de Calor - Cumplimiento por Docente y Programa",
+        "🔥 Gráfica 2: Mapa de Calor - Top 10 Docentes vs Top 10 Programas",
         expanded=False,
     ):
         mostrar_leyenda_grafica(
-            "Cumplimiento por Docente y Programa",
-            "¿Qué docentes cumplen mejor los estándares en cada programa?",
-            "🔹 Cada fila = un docente.\n🔹 Cada columna = un programa.\n🔹 El color indica el **% de cumplimiento** promedio de la métrica seleccionada.\n🔹 Verde = alto cumplimiento, Rojo = bajo cumplimiento.",
+            "Cumplimiento por Docente y Programa (Top 10)",
+            "¿Qué docentes cumplen mejor en cada programa?",
+            "🔹 Verde = alto cumplimiento, Rojo = bajo cumplimiento.",
         )
 
         if (
@@ -606,9 +419,8 @@ def main():
             and "area" in df_filtrado.columns
             and metricas_disp
         ):
-
             metrica_heatmap = st.selectbox(
-                "Seleccionar métrica para el mapa de calor",
+                "Seleccionar métrica",
                 options=metricas_disp,
                 format_func=lambda x: METRICAS_CONFIG[x]["nombre"],
                 key="heatmap_metrica",
@@ -616,7 +428,6 @@ def main():
 
             col_cumplimiento = f"{metrica_heatmap}_cumplimiento"
 
-            # --> Línea para calcular los porcentajes de cumplimiento
             df_heatmap = df_filtrado.pivot_table(
                 index="nombres_apellidos",
                 columns="area",
@@ -624,150 +435,43 @@ def main():
                 aggfunc="mean",
             )
 
-            docentes_count = df_filtrado.groupby("nombres_apellidos").size()
-            docentes_validos = docentes_count[docentes_count >= 1].index
-            df_heatmap = df_heatmap.loc[df_heatmap.index.isin(docentes_validos)]
+            df_heatmap["promedio"] = df_heatmap.mean(axis=1)
+            df_heatmap = df_heatmap.sort_values("promedio", ascending=False)
+            top_docentes = df_heatmap.head(10).index
+            df_heatmap = df_heatmap.loc[top_docentes]
+            df_heatmap = df_heatmap.drop(columns=["promedio"])
 
-            programas_count = df_filtrado.groupby("area").size()
-            programas_validos = programas_count[programas_count >= 1].index
-            df_heatmap = df_heatmap[
-                df_heatmap.columns[df_heatmap.columns.isin(programas_validos)]
-            ]
+            promedios_programas = df_heatmap.mean(axis=0).sort_values(ascending=False)
+            top_programas = promedios_programas.head(10).index
+            df_heatmap = df_heatmap[top_programas]
 
-            if (
-                not df_heatmap.empty
-                and len(df_heatmap) > 0
-                and len(df_heatmap.columns) > 0
-            ):
-
-                # >>> Línea que pone el top 10 para que el mapa no se vea tan grande
-                # Top 10 docentes con mejor promedio
-                df_heatmap["promedio"] = df_heatmap.mean(axis=1)
-                df_heatmap = df_heatmap.sort_values("promedio", ascending=False)
-                top_docentes = df_heatmap.head(10).index
-                df_heatmap = df_heatmap.loc[top_docentes]
-                df_heatmap = df_heatmap.drop(columns=["promedio"])
-
-                # Top 10 programas con mejor promedio
-                promedios_programas = df_heatmap.mean(axis=0).sort_values(
-                    ascending=False
-                )
-                top_programas = promedios_programas.head(10).index
-                df_heatmap = df_heatmap[top_programas]
-
-                # Ordenar docentes de mejor a peor
-                df_heatmap["promedio"] = df_heatmap.mean(axis=1)
-                df_heatmap = df_heatmap.sort_values("promedio", ascending=False)
-                df_heatmap = df_heatmap.drop(columns=["promedio"])
-
+            if not df_heatmap.empty:
                 fig_heatmap = px.imshow(
                     df_heatmap,
-                    title=f"Mapa de Calor: % de Cumplimiento de {METRICAS_CONFIG[metrica_heatmap]['nombre']} por Docente y Programa (Top 10)",
+                    title=f"Top 10 Docentes vs Top 10 Programas - {METRICAS_CONFIG[metrica_heatmap]['nombre']}",
                     color_continuous_scale="RdYlGn",
                     aspect="auto",
                     text_auto=True,
-                    labels={
-                        "x": "Programa",
-                        "y": "Docente",
-                        "color": "% Cumplimiento",
-                    },
+                    labels={"x": "Programa", "y": "Docente", "color": "% Cumplimiento"},
                     range_color=[0, 100],
+                    height=max(400, len(df_heatmap) * 30),
                 )
-
-                height = max(400, len(df_heatmap) * 25)
                 fig_heatmap.update_layout(
-                    template="plotly_white",
-                    height=height,
-                    xaxis=dict(tickangle=45),
-                    yaxis=dict(tickfont=dict(size=10)),
+                    template="plotly_white", xaxis=dict(tickangle=45)
                 )
                 fig_heatmap.update_traces(
-                    texttemplate="%{z:.1f}%",
-                    textfont=dict(size=10, color="black"),
+                    texttemplate="%{z:.1f}%", textfont=dict(size=10)
                 )
                 st.plotly_chart(fig_heatmap, use_container_width=True)
 
-                promedios = df_heatmap.mean(axis=1).sort_values(ascending=False)
-                mejor_docente = promedios.index[0] if len(promedios) > 0 else "N/A"
-                peor_docente = promedios.index[-1] if len(promedios) > 0 else "N/A"
-                mejor_valor = promedios.iloc[0] if len(promedios) > 0 else 0
-                peor_valor = promedios.iloc[-1] if len(promedios) > 0 else 0
-
-                promedios_programa = df_heatmap.mean(axis=0).sort_values(
-                    ascending=False
-                )
-                mejor_programa = (
-                    promedios_programa.index[0]
-                    if len(promedios_programa) > 0
-                    else "N/A"
-                )
-                peor_programa = (
-                    promedios_programa.index[-1]
-                    if len(promedios_programa) > 0
-                    else "N/A"
-                )
-
-                if not df_heatmap.empty:
-                    max_cell = df_heatmap.max().max()
-                    min_cell = df_heatmap.min().min()
-                    max_docente = df_heatmap.stack().idxmax()[0]
-                    max_programa = df_heatmap.stack().idxmax()[1]
-                    min_docente = df_heatmap.stack().idxmin()[0]
-                    min_programa = df_heatmap.stack().idxmin()[1]
-                else:
-                    max_cell = min_cell = 0
-                    max_docente = max_programa = min_docente = min_programa = "N/A"
-
-                que_muestra = f"Este mapa de calor muestra el cumplimiento de los TOP 10 docentes en los TOP 10 programas, medido por {METRICAS_CONFIG[metrica_heatmap]['nombre']}. Los colores VERDES indican alto cumplimiento (≥70%) y ROJOS bajo cumplimiento (<70%)."
-
-                if max_docente != "N/A":
-                    que_muestra += f" El mejor cumplimiento es de {max_docente} en {max_programa} con {max_cell:.1f}%. El peor es {min_docente} en {min_programa} con {min_cell:.1f}%."
-
-                if mejor_docente != "N/A":
-                    que_muestra += f" {mejor_docente} es el docente con mejor promedio ({mejor_valor:.1f}%) y {peor_docente} el de menor ({peor_valor:.1f}%)."
-
-                if mejor_programa != "N/A":
-                    que_muestra += f" {mejor_programa} es el programa con mejor cumplimiento y {peor_programa} el de menor."
-
-                como_leer = f"🔹 Cada FILA = un docente (Top 10).\n🔹 Cada COLUMNA = un programa (Top 10).\n🔹 COLOR:\n   🟢 Verde = alto cumplimiento (≥70%)\n   🟡 Amarillo = cumplimiento medio (40-70%)\n   🔴 Rojo = bajo cumplimiento (<40%)\n🔹 Docentes ordenados de mejor a peor promedio (arriba = mejores)."
-
-                que_buscar = f"🎯 Busca:\n🔹 Filas VERDES completas → docentes excelentes en todo.\n🔹 Columnas VERDES completas → programas con buen cumplimiento.\n🔹 Celdas ROJAS → áreas de mejora específicas."
-
-                if mejor_docente != "N/A":
-                    que_buscar += f"\n🔹 {mejor_docente} es el mejor docente promedio."
-                if peor_docente != "N/A":
-                    que_buscar += f"\n🔹 {peor_docente} necesita mejorar."
-                if mejor_programa != "N/A":
-                    que_buscar += (
-                        f"\n🔹 {mejor_programa} es el programa con mejor cumplimiento."
-                    )
-
-                mostrar_interpretacion_grafica(
-                    f"Cómo interpretar el Mapa de Calor de Cumplimiento de {METRICAS_CONFIG[metrica_heatmap]['nombre']} por Docente y Programa (Top 10)",
-                    que_muestra,
-                    como_leer,
-                    que_buscar,
-                )
-
-            else:
-                st.warning(
-                    "⚠️ No hay suficientes datos para generar el mapa de calor. Se necesitan al menos 1 docente y 1 programa con datos."
-                )
-        else:
-            st.warning(
-                "⚠️ No se encontraron las columnas necesarias: 'nombres_apellidos', 'area' o métricas disponibles."
-            )
-
     # ================================================================
-    # GRÁFICA 3: Barras Horizontales - Ranking de Programas por Cumplimiento
+    # GRÁFICA 3: Barras Horizontales (Top 10)
     # ================================================================
-    with st.expander(
-        "📊 Gráfica 3: Ranking de Programas por Cumplimiento", expanded=False
-    ):
+    with st.expander("📊 Gráfica 3: Ranking de Programas (Top 10)", expanded=False):
         mostrar_leyenda_grafica(
-            "Ranking de Programas por Cumplimiento",
-            "¿Qué programas tienen mayor porcentaje de cumplimiento en cada métrica?",
-            "🔹 Cada barra representa el **% de cumplimiento promedio** de un programa.\n🔹 La línea roja marca el 70% (umbral de cumplimiento).\n🔹 Barras verdes = cumplen (>70%), rojas = no cumplen (<70%).",
+            "Top 10 Programas por Cumplimiento",
+            "¿Qué programas tienen mayor cumplimiento?",
+            "🔹 Barras verdes = cumplen (>70%), rojas = no cumplen (<70%).",
         )
 
         if "area" in df_filtrado.columns and metricas_disp:
@@ -784,18 +488,10 @@ def main():
                 .mean()
                 .reset_index()
                 .dropna()
-                .sort_values(col_cumplimiento, ascending=True)
             )
+            df_area = df_area.sort_values(col_cumplimiento, ascending=True).tail(10)
 
             if not df_area.empty:
-                cumple_count = sum(
-                    1 for _, row in df_area.iterrows() if row[col_cumplimiento] >= 70
-                )
-                total = len(df_area)
-                mejor_programa = df_area.loc[df_area[col_cumplimiento].idxmax(), "area"]
-                peor_programa = df_area.loc[df_area[col_cumplimiento].idxmin(), "area"]
-                promedio = df_area[col_cumplimiento].mean()
-
                 colores_bar = [
                     "#2e7d32" if x >= 70 else "#c62828"
                     for x in df_area[col_cumplimiento]
@@ -819,134 +515,62 @@ def main():
                     annotation_text="Umbral 70%",
                 )
                 fig_bar_h.update_layout(
-                    title=f"Ranking de Programas - % Cumplimiento de {METRICAS_CONFIG[metrica_bar_h]['nombre']}",
+                    title=f'Top 10 Programas - {METRICAS_CONFIG[metrica_bar_h]["nombre"]}',
                     template="plotly_white",
                     height=max(400, len(df_area) * 40),
                     xaxis_title="% Cumplimiento",
                     yaxis_title="Programa",
                     xaxis=dict(range=[0, 100]),
                 )
-                st.plotly_chart(fig_bar_h, use_container_width=True, key="ranking_3")
-
-                mostrar_interpretacion_grafica(
-                    f"Cómo interpretar el Ranking de Programas por Cumplimiento en {METRICAS_CONFIG[metrica_bar_h]['nombre']}",
-                    f"{cumple_count} de {total} programas ({cumple_count/total*100:.1f}%) superan el 70% de cumplimiento. El promedio general es {promedio:.1f}%. {mejor_programa} es el programa con mejor cumplimiento y {peor_programa} el peor.",
-                    f"🔹 Las barras VERDES superan el 70% (cumplen).\n🔹 Las barras ROJAS están por debajo del 70% (no cumplen).\n🔹 Barras más largas = mayor cumplimiento.",
-                    f"🎯 Busca qué programas están a la derecha del 70% (cumplen) y cuáles a la izquierda (no cumplen). {mejor_programa} es el programa con mejor cumplimiento.",
-                )
+                st.plotly_chart(fig_bar_h, use_container_width=True)
 
     # ================================================================
-    # GRÁFICA 4: Barras Verticales - Distribución por Programa (sin cambios, es conteo)
+    # GRÁFICA 4: Barras Verticales (Top 10)
     # ================================================================
     with st.expander(
-        "📊 Gráfica 4: Barras Verticales - Distribución por Programa", expanded=False
+        "📊 Gráfica 4: Top 10 Programas con más Grabaciones", expanded=False
     ):
         mostrar_leyenda_grafica(
-            "Distribución de Grabaciones por Programa",
-            "¿Qué programas tienen más grabaciones y cómo se distribuyen?",
-            "🔹 Cada barra representa un programa.\n🔹 El color muestra la clase (Verde=ENTRETENIDO, Rojo=ABURRIDO).\n🔹 Altura de barra = cantidad de grabaciones.",
+            "Top 10 Programas con más Grabaciones",
+            "¿Qué programas tienen más grabaciones?",
+            "🔹 Verde = ENTRETENIDO, Rojo = ABURRIDO.",
         )
 
-        if "area" in df_filtrado.columns and "Clase_Predicha" in df_filtrado.columns:
+        if "area" in df_filtrado.columns and "Clase_Normalizada" in df_filtrado.columns:
+            top_programas = df_filtrado["area"].value_counts().head(10).index
+            df_filtrado_top = df_filtrado[df_filtrado["area"].isin(top_programas)]
+
             df_area_clase = (
-                df_filtrado.groupby(["area", "Clase_Predicha"])
+                df_filtrado_top.groupby(["area", "Clase_Normalizada"])
                 .size()
                 .reset_index(name="count")
             )
-            clases_presentes = df_area_clase["Clase_Predicha"].unique()
-            if len(clases_presentes) > 0:
-                df_area_clase = df_area_clase[
-                    df_area_clase["Clase_Predicha"].isin(clases_presentes)
-                ]
-            else:
-                df_area_clase = pd.DataFrame()
 
             if not df_area_clase.empty:
-                color_map = {}
-                for clase in clases_presentes:
-                    if clase.upper() == "ENTRETENIDO":
-                        color_map[clase] = "#2e7d32"
-                    elif clase.upper() == "ABURRIDO":
-                        color_map[clase] = "#c62828"
-                    else:
-                        color_map[clase] = "#1f77b4"
+                color_map = {"ENTRETENIDO": "#2e7d32", "ABURRIDO": "#c62828"}
 
                 fig_bar_v = px.bar(
                     df_area_clase,
                     x="area",
                     y="count",
-                    color="Clase_Predicha",
+                    color="Clase_Normalizada",
                     color_discrete_map=color_map,
-                    title="Distribución de Grabaciones por Programa y Clase",
+                    title="Top 10 Programas - Distribución por Clase",
                     text="count",
                     barmode="group",
                 )
                 fig_bar_v.update_traces(textposition="outside")
-                fig_bar_v.update_layout(
-                    template="plotly_white",
-                    height=450,
-                    xaxis_title="Programa",
-                    yaxis_title="Número de Grabaciones",
-                )
+                fig_bar_v.update_layout(template="plotly_white", height=450)
                 st.plotly_chart(fig_bar_v, use_container_width=True)
 
-                total_entretenido = (
-                    df_area_clase[
-                        df_area_clase["Clase_Predicha"].str.upper() == "ENTRETENIDO"
-                    ]["count"].sum()
-                    if "ENTRETENIDO" in [c.upper() for c in clases_presentes]
-                    else 0
-                )
-                total_aburrido = (
-                    df_area_clase[
-                        df_area_clase["Clase_Predicha"].str.upper() == "ABURRIDO"
-                    ]["count"].sum()
-                    if "ABURRIDO" in [c.upper() for c in clases_presentes]
-                    else 0
-                )
-                total = total_entretenido + total_aburrido
-                pct_entretenido = (total_entretenido / total) * 100 if total > 0 else 0
-
-                mejor_programa = "N/A"
-                peor_programa = "N/A"
-                if total_entretenido > 0:
-                    df_entretenido = df_area_clase[
-                        df_area_clase["Clase_Predicha"].str.upper() == "ENTRETENIDO"
-                    ]
-                    if not df_entretenido.empty:
-                        mejor_programa = df_entretenido.loc[
-                            df_entretenido["count"].idxmax(), "area"
-                        ]
-                if total_aburrido > 0:
-                    df_aburrido = df_area_clase[
-                        df_area_clase["Clase_Predicha"].str.upper() == "ABURRIDO"
-                    ]
-                    if not df_aburrido.empty:
-                        peor_programa = df_aburrido.loc[
-                            df_aburrido["count"].idxmax(), "area"
-                        ]
-
-                mostrar_interpretacion_grafica(
-                    "Cómo interpretar la Distribución de Grabaciones por Programa",
-                    f"De {total} grabaciones, {total_entretenido} ({pct_entretenido:.1f}%) son ENTRETENIDAS y {total_aburrido} ({100-pct_entretenido:.1f}%) son ABURRIDAS. {mejor_programa} tiene más clases ENTRETENIDAS. {peor_programa} tiene más clases ABURRIDAS.",
-                    f"🔹 Cada barra representa un programa.\n🔹 VERDE = clases ENTRETENIDAS.\n🔹 ROJO = clases ABURRIDAS.\n🔹 Más VERDE que ROJO = programa con buena calidad.",
-                    f"🎯 Busca programas con más VERDE que ROJO (buena calidad). Los programas con mucho ROJO necesitan mejorar.",
-                )
-            else:
-                st.warning("⚠️ No hay datos de clases para mostrar.")
-        else:
-            st.warning("⚠️ No se encontraron las columnas 'area' o 'Clase_Predicha'.")
-
     # ================================================================
-    # GRÁFICA 5: Desviación del Promedio de Cumplimiento
+    # GRÁFICA 5: Desviación (Top 10)
     # ================================================================
-    with st.expander(
-        "🌊 Gráfica 5: Desviación del Promedio de Cumplimiento", expanded=False
-    ):
+    with st.expander("🌊 Gráfica 5: Desviación del Promedio (Top 10)", expanded=False):
         mostrar_leyenda_grafica(
-            "Desviación de Docentes del Promedio de Cumplimiento",
-            "¿Qué docentes están por encima o por debajo del promedio de cumplimiento?",
-            "🔹 Barras verdes = por encima del promedio (mejor).\n🔹 Barras rojas = por debajo del promedio (peor).\n🔹 La línea vertical en 0 es el promedio.",
+            "Desviación de Top 10 Docentes",
+            "¿Qué docentes están por encima o debajo del promedio?",
+            "🔹 Verde = encima del promedio, Rojo = debajo del promedio.",
         )
 
         if "nombres_apellidos" in df_filtrado.columns and metricas_disp:
@@ -964,19 +588,17 @@ def main():
                 .reset_index()
                 .dropna()
             )
+            df_water = df_water.sort_values(col_cumplimiento, ascending=False).head(10)
+
             if not df_water.empty:
                 promedio_general = df_water[col_cumplimiento].mean()
                 df_water["desviacion"] = df_water[col_cumplimiento] - promedio_general
                 df_water = df_water.sort_values("desviacion", ascending=True)
 
-                mejor = df_water.loc[df_water["desviacion"].idxmax()]
-                peor = df_water.loc[df_water["desviacion"].idxmin()]
-                encima = len(df_water[df_water["desviacion"] > 0])
-                debajo = len(df_water[df_water["desviacion"] < 0])
-
                 colores_water = [
                     "#2e7d32" if x >= 0 else "#c62828" for x in df_water["desviacion"]
                 ]
+
                 fig_water = go.Figure()
                 fig_water.add_trace(
                     go.Bar(
@@ -990,7 +612,7 @@ def main():
                 )
                 fig_water.add_vline(x=0, line_dash="dash", line_color="gray")
                 fig_water.update_layout(
-                    title=f"Desviación del Promedio de Cumplimiento - {METRICAS_CONFIG[metrica_water]['nombre']}",
+                    title=f'Top 10 Docentes - Desviación de {METRICAS_CONFIG[metrica_water]["nombre"]}',
                     template="plotly_white",
                     height=max(400, len(df_water) * 35),
                     xaxis_title="Desviación (puntos porcentuales)",
@@ -998,62 +620,52 @@ def main():
                 )
                 st.plotly_chart(fig_water, use_container_width=True)
 
-                mostrar_interpretacion_grafica(
-                    f"Cómo interpretar la Desviación del Promedio de Cumplimiento en {METRICAS_CONFIG[metrica_water]['nombre']}",
-                    f"El promedio de cumplimiento general es {promedio_general:.1f}%. {encima} docentes están por encima y {debajo} por debajo. {mejor['nombres_apellidos']} es el mejor con {mejor[col_cumplimiento]:.1f}% de cumplimiento. {peor['nombres_apellidos']} es el peor con {peor[col_cumplimiento]:.1f}%.",
-                    f"🔹 Las barras VERDES están por ENCIMA del promedio (mejor cumplimiento).\n🔹 Las barras ROJAS están por DEBAJO del promedio (peor cumplimiento).\n🔹 La línea vertical en 0 es el PROMEDIO.",
-                    f"🎯 Busca los docentes con barras más largas a la derecha (mejores) y a la izquierda (peores).",
-                )
-            else:
-                st.warning("⚠️ No hay datos de docentes para calcular desviación.")
-        else:
-            st.warning("⚠️ No se encontraron columnas necesarias.")
-
     # ================================================================
-    # GRÁFICA 7: Comparación de Cumplimiento por Clase
+    # GRÁFICA 6: Comparación por Clase
     # ================================================================
     with st.expander(
-        "📊 Gráfica 7: Comparación de Cumplimiento por Clase", expanded=False
+        "📊 Gráfica 6: Comparación de Cumplimiento por Clase", expanded=False
     ):
         mostrar_leyenda_grafica(
             "Comparación de Cumplimiento por Clase",
-            "¿Cómo se compara el cumplimiento entre clases ENTRETENIDO y ABURRIDO?",
-            "🔹 Cada barra representa el **% de cumplimiento promedio** de una métrica.\n🔹 🟢 Verde = ENTRETENIDO.\n🔹 🔴 Rojo = ABURRIDO.\n🔹 Barras más altas = mejor cumplimiento.",
+            "¿Cómo se compara el cumplimiento entre ENTRETENIDO y ABURRIDO?",
+            "🔹 Verde = ENTRETENIDO, Rojo = ABURRIDO.",
         )
 
-        # Lista de métricas SIN Porcentaje_Certeza
         metricas_disponibles = [
             "DME_s",
             "DTE_ratio",
             "Enthusiasm_Score",
             "Tone_CoV",
             "sigma2_IM",
-            # "Porcentaje_Certeza",  # ELIMINADA
             "Jitter_Score",
             "IMP_promedio",
         ]
-
         metricas_existentes = [
             col for col in metricas_disponibles if col in df_filtrado.columns
         ]
 
-        if metricas_existentes and "Clase_Predicha" in df_filtrado.columns:
+        if metricas_existentes and "Clase_Normalizada" in df_filtrado.columns:
             metrica_seleccionada = st.selectbox(
-                "Selecciona una métrica para comparar:",
+                "Selecciona una métrica:",
                 options=metricas_existentes,
                 format_func=lambda x: METRICAS_CONFIG[x]["nombre"],
                 key="bar_clase_metrica",
             )
             col_cumplimiento = f"{metrica_seleccionada}_cumplimiento"
 
-            clases_unicas = df_filtrado["Clase_Predicha"].dropna().unique()
+            clases_unicas = df_filtrado["Clase_Normalizada"].dropna().unique()
 
             if len(clases_unicas) >= 2:
-                clase1 = clases_unicas[0]
-                clase2 = clases_unicas[1] if len(clases_unicas) > 1 else clase1
+                clase1 = (
+                    "ENTRETENIDO"
+                    if "ENTRETENIDO" in clases_unicas
+                    else clases_unicas[0]
+                )
+                clase2 = "ABURRIDO" if "ABURRIDO" in clases_unicas else clases_unicas[1]
 
-                df_clase1 = df_filtrado[df_filtrado["Clase_Predicha"] == clase1]
-                df_clase2 = df_filtrado[df_filtrado["Clase_Predicha"] == clase2]
+                df_clase1 = df_filtrado[df_filtrado["Clase_Normalizada"] == clase1]
+                df_clase2 = df_filtrado[df_filtrado["Clase_Normalizada"] == clase2]
 
                 prom_clase1 = (
                     df_clase1[col_cumplimiento].mean() if not df_clase1.empty else 0
@@ -1080,142 +692,348 @@ def main():
                         text=df_barras["Promedio"].apply(lambda x: f"{x:.1f}%"),
                         textposition="outside",
                         marker=dict(color=df_barras["Color"]),
-                        hovertemplate="<b>%{x}</b><br>% Cumplimiento: %{y:.1f}%<br>Grabaciones: %{customdata}<extra></extra>",
                         customdata=counts,
                     )
                 )
-
                 fig_barras.add_hline(
                     y=70,
                     line_dash="dash",
                     line_color="red",
-                    line_width=2,
                     annotation_text="Umbral 70%",
-                    annotation_position="top right",
                 )
-
                 fig_barras.update_layout(
                     height=450,
                     template="plotly_white",
                     xaxis_title="Clase",
                     yaxis_title="% Cumplimiento",
-                    showlegend=False,
-                    margin=dict(l=40, r=40, t=30, b=40),
                     yaxis=dict(range=[0, 100]),
                 )
-
                 st.plotly_chart(fig_barras, use_container_width=True)
 
-                diferencia = prom_clase1 - prom_clase2
-                mejor_clase = clase1 if prom_clase1 > prom_clase2 else clase2
+        # ================================================================
 
-                que_muestra = f"Este gráfico compara el cumplimiento promedio de {METRICAS_CONFIG[metrica_seleccionada]['nombre']} entre las clases {clase1} y {clase2}. La clase {clase1} tiene {prom_clase1:.1f}% de cumplimiento ({counts[0]} grabaciones) y {clase2} tiene {prom_clase2:.1f}% ({counts[1]} grabaciones). La diferencia es de {diferencia:+.1f} puntos porcentuales."
+        # GRÁFICA 7: Comparativa ENTRETENIDO vs ABURRIDO (EN PORCENTAJE DE CUMPLIMIENTO)
+        # ================================================================
+        with st.expander(
+            "📊 Gráfica 7: Comparativa ENTRETENIDO vs ABURRIDO", expanded=False
+        ):
+            mostrar_leyenda_grafica(
+                "Comparativa de Cumplimiento entre ENTRETENIDO y ABURRIDO",
+                "¿Qué métricas tienen mayor porcentaje de cumplimiento en cada clase?",
+                "🔹 Barras verdes = ENTRETENIDO | Barras rojas = ABURRIDO\n🔹 100% = cumple la meta",
+            )
 
-                como_leer = f"🔹 Cada barra = % de cumplimiento promedio.\n🔹 🟢 Verde = {clase1}.\n🔹 🔴 Rojo = {clase2}.\n🔹 La línea roja = umbral del 70%."
+            if "Clase_Normalizada" in df_filtrado.columns and metricas_disp:
 
-                que_buscar = f"🎯 Busca la diferencia entre las barras y qué clase supera el 70%. {mejor_clase} es la clase con mejor cumplimiento."
+                # ============================================================
+                # PASO 1: GENERAR COLUMNAS DE CUMPLIMIENTO
+                # ============================================================
+                df_temp = df_filtrado.copy()
 
-                mostrar_interpretacion_grafica(
-                    f"Cómo interpretar la Comparación de Cumplimiento de {METRICAS_CONFIG[metrica_seleccionada]['nombre']} por Clase",
-                    que_muestra,
-                    como_leer,
-                    que_buscar,
+                for col in metricas_disp:
+                    col_cumplimiento = f"{col}_cumplimiento"
+                    if col_cumplimiento not in df_temp.columns:
+                        config = METRICAS_CONFIG[col]
+                        df_temp[col_cumplimiento] = df_temp[col].apply(
+                            lambda x, config=config: calcular_cumplimiento(x, config)
+                        )
+
+                # ============================================================
+                # PASO 2: LISTA DE COLUMNAS DE CUMPLIMIENTO
+                # ============================================================
+                columnas_cumplimiento = [f"{col}_cumplimiento" for col in metricas_disp]
+                columnas_existentes = [
+                    col for col in columnas_cumplimiento if col in df_temp.columns
+                ]
+
+                if columnas_existentes:
+                    # ============================================================
+                    # PASO 3: CALCULAR PROMEDIO POR CLASE (ENTRETENIDO vs ABURRIDO)
+                    # ============================================================
+                    df_promedios = (
+                        df_temp.groupby("Clase_Normalizada")[columnas_existentes]
+                        .mean()
+                        .reset_index()
+                    )
+
+                    # ============================================================
+                    # PASO 4: REORGANIZAR PARA GRÁFICA
+                    # ============================================================
+                    df_melt = df_promedios.melt(
+                        id_vars="Clase_Normalizada",
+                        var_name="Columna",
+                        value_name="Cumplimiento_%",
+                    )
+
+                    # ============================================================
+                    # PASO 5: MAPEAR NOMBRES DE MÉTRICAS
+                    # ============================================================
+                    df_melt["Métrica"] = df_melt["Columna"].str.replace(
+                        "_cumplimiento", ""
+                    )
+                    df_melt["Nombre_Métrica"] = df_melt["Métrica"].map(
+                        lambda x: (
+                            METRICAS_CONFIG[x]["nombre"] if x in METRICAS_CONFIG else x
+                        )
+                    )
+
+                    # ============================================================
+                    # PASO 6: GRÁFICA DE BARRAS
+                    # ============================================================
+                    fig = px.bar(
+                        df_melt,
+                        x="Nombre_Métrica",
+                        y="Cumplimiento_%",
+                        color="Clase_Normalizada",
+                        barmode="group",
+                        color_discrete_map={
+                            "ENTRETENIDO": "#2e7d32",
+                            "ABURRIDO": "#c62828",
+                        },
+                        title="Comparativa de Cumplimiento entre ENTRETENIDO y ABURRIDO",
+                        labels={
+                            "Nombre_Métrica": "Métrica",
+                            "Cumplimiento_%": "Cumplimiento (%)",
+                            "Clase_Normalizada": "Clase",
+                        },
+                        text_auto=".1f",
+                        range_y=[0, 100],
+                    )
+                    fig.update_layout(
+                        template="plotly_white", height=450, xaxis_tickangle=-45
+                    )
+                    fig.update_traces(textposition="outside")
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # ============================================================
+                    # PASO 7: TABLA RESUMEN
+                    # ============================================================
+                    st.markdown("### 📋 Tabla Resumen (% de Cumplimiento)")
+
+                    df_tabla = df_promedios.set_index(
+                        "Clase_Normalizada"
+                    ).T.reset_index()
+                    df_tabla = df_tabla.rename(columns={"index": "Columna"})
+
+                    # Quitar "_cumplimiento" y mapear nombres
+                    df_tabla["Métrica"] = df_tabla["Columna"].str.replace(
+                        "_cumplimiento", ""
+                    )
+                    df_tabla["Métrica"] = df_tabla["Métrica"].map(
+                        lambda x: (
+                            METRICAS_CONFIG[x]["nombre"] if x in METRICAS_CONFIG else x
+                        )
+                    )
+
+                    # Calcular diferencia
+                    df_tabla["Diferencia"] = (
+                        df_tabla["ENTRETENIDO"] - df_tabla["ABURRIDO"]
+                    )
+                    df_tabla["Mejor"] = df_tabla.apply(
+                        lambda row: (
+                            "🟢 ENTRETENIDO"
+                            if row["Diferencia"] > 0
+                            else "🔴 ABURRIDO" if row["Diferencia"] < 0 else "⚪ Igual"
+                        ),
+                        axis=1,
+                    )
+
+                    # Formatear como porcentaje
+                    for col in ["ENTRETENIDO", "ABURRIDO", "Diferencia"]:
+                        df_tabla[col] = df_tabla[col].apply(lambda x: f"{x:.1f}%")
+
+                    df_tabla = df_tabla.rename(
+                        columns={
+                            "ENTRETENIDO": "ENTRETENIDO (%)",
+                            "ABURRIDO": "ABURRIDO (%)",
+                            "Diferencia": "Diferencia (p.p.)",
+                        }
+                    )
+
+                    st.dataframe(
+                        df_tabla[
+                            [
+                                "Métrica",
+                                "ENTRETENIDO (%)",
+                                "ABURRIDO (%)",
+                                "Diferencia (p.p.)",
+                                "Mejor",
+                            ]
+                        ],
+                        hide_index=True,
+                        use_container_width=True,
+                    )
+                else:
+                    st.warning("No se pudieron generar columnas de cumplimiento")
+
+    # ================================================================
+    # GRÁFICA 8: Top 10 Docentes - ENTRETENIDO vs ABURRIDO
+    # ================================================================
+    with st.expander(
+        "🏆 Gráfica 8: Top 10 Docentes - ENTRETENIDO vs ABURRIDO", expanded=False
+    ):
+        mostrar_leyenda_grafica(
+            "Top 10 Docentes con más Clases ENTRETENIDO",
+            "¿Qué docentes tienen más clases ENTRETENIDO?",
+            "🔹 Barras verdes = ENTRETENIDO | Barras rojas = ABURRIDO\n🔹 Docentes ordenados de mejor a peor",
+        )
+
+        if (
+            "nombres_apellidos" in df_filtrado.columns
+            and "Clase_Normalizada" in df_filtrado.columns
+        ):
+            # Contar clases por docente y clase
+            df_docente_clase = (
+                df_filtrado.groupby(["nombres_apellidos", "Clase_Normalizada"])
+                .size()
+                .reset_index(name="count")
+            )
+
+            # Pivotar para tener columnas ENTRETENIDO y ABURRIDO
+            df_pivot = (
+                df_docente_clase.pivot(
+                    index="nombres_apellidos",
+                    columns="Clase_Normalizada",
+                    values="count",
+                )
+                .fillna(0)
+                .reset_index()
+            )
+
+            # Asegurar que existan ambas columnas
+            for col in ["ENTRETENIDO", "ABURRIDO"]:
+                if col not in df_pivot.columns:
+                    df_pivot[col] = 0
+
+            # Calcular total y porcentaje
+            df_pivot["total"] = df_pivot["ENTRETENIDO"] + df_pivot["ABURRIDO"]
+            df_pivot["pct_entretenido"] = (
+                df_pivot["ENTRETENIDO"] / df_pivot["total"]
+            ) * 100
+
+            # Filtrar docentes con al menos 3 clases
+            df_pivot = df_pivot[df_pivot["total"] >= 3]
+
+            # Ordenar por porcentaje de ENTRETENIDO
+            df_pivot = df_pivot.sort_values("pct_entretenido", ascending=False).head(10)
+
+            if not df_pivot.empty:
+                # Crear gráfica de barras apiladas
+                fig = go.Figure()
+
+                # Barras de ENTRETENIDO (verde)
+                fig.add_trace(
+                    go.Bar(
+                        y=df_pivot["nombres_apellidos"],
+                        x=df_pivot["ENTRETENIDO"],
+                        name="ENTRETENIDO",
+                        orientation="h",
+                        marker_color="#2e7d32",
+                        text=df_pivot["ENTRETENIDO"].astype(int),
+                        textposition="inside",
+                    )
+                )
+
+                # Barras de ABURRIDO (rojo)
+                fig.add_trace(
+                    go.Bar(
+                        y=df_pivot["nombres_apellidos"],
+                        x=df_pivot["ABURRIDO"],
+                        name="ABURRIDO",
+                        orientation="h",
+                        marker_color="#c62828",
+                        text=df_pivot["ABURRIDO"].astype(int),
+                        textposition="inside",
+                    )
+                )
+
+                fig.update_layout(
+                    barmode="stack",
+                    title="Top 10 Docentes - Clases ENTRETENIDO vs ABURRIDO",
+                    template="plotly_white",
+                    height=450,
+                    xaxis_title="Número de Clases",
+                    yaxis_title="Docente",
+                    legend=dict(x=1, y=1),
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+                # Mostrar tabla con porcentajes
+                st.markdown("### 📋 Resumen por Docente")
+                df_show = df_pivot[
+                    [
+                        "nombres_apellidos",
+                        "ENTRETENIDO",
+                        "ABURRIDO",
+                        "total",
+                        "pct_entretenido",
+                    ]
+                ].copy()
+                df_show = df_show.rename(
+                    columns={
+                        "nombres_apellidos": "Docente",
+                        "ENTRETENIDO": "Clases ENTRETENIDO",
+                        "ABURRIDO": "Clases ABURRIDO",
+                        "total": "Total Clases",
+                        "pct_entretenido": "% ENTRETENIDO",
+                    }
+                )
+                df_show["% ENTRETENIDO"] = df_show["% ENTRETENIDO"].apply(
+                    lambda x: f"{x:.1f}%"
+                )
+                st.dataframe(df_show, hide_index=True, use_container_width=True)
+
+    # ================================================================
+    # 📋 TABLA DE RECOMENDACIONES - SOLO DOCENTE SELECCIONADO (AL FINAL)
+    # ================================================================
+    st.write("---")
+    with st.expander("📋 Tabla de recomendaciones", expanded=True):
+        if (
+            "nombres_apellidos" in df_filtrado.columns
+            and "recomen_falencia" in df_filtrado.columns
+        ):
+            df_tabla = df_filtrado[["nombres_apellidos", "recomen_falencia"]].copy()
+
+            st.subheader("📋 Tabla de Recomendaciones por Docente")
+
+            docentes_disponibles = sorted(
+                df_tabla["nombres_apellidos"].dropna().unique()
+            )
+
+            if len(docentes_disponibles) > 0:
+                opcion_docente = st.selectbox(
+                    "👨‍🏫 Seleccionar docente:",
+                    options=docentes_disponibles,
+                    key="filtro_docente_recomendaciones_final",
+                )
+
+                df_tabla = df_tabla[df_tabla["nombres_apellidos"] == opcion_docente]
+                st.success(f"✅ Mostrando recomendaciones de: **{opcion_docente}**")
+
+                st.dataframe(
+                    df_tabla,
+                    column_config={
+                        "nombres_apellidos": "👨‍🏫 Docente",
+                        "recomen_falencia": "💡 Recomendación",
+                    },
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+                csv = df_tabla.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    label="📥 Descargar CSV",
+                    data=csv,
+                    file_name=f"recomendaciones_{opcion_docente}.csv",
+                    mime="text/csv",
                 )
             else:
-                st.info(
-                    f"⚠️ Solo hay una clase disponible: {clases_unicas[0]}. No se puede comparar."
-                )
+                st.info("No hay docentes disponibles para mostrar recomendaciones.")
         else:
             st.warning(
-                "⚠️ No hay métricas disponibles o no existe la columna 'Clase_Predicha'."
+                "No se encontraron las columnas 'nombres_apellidos' o 'recomen_falencia'."
             )
 
-    # ================================================================
-    # 📋 TABLA DE RECOMENDACIONES (NUEVA)
-    # ================================================================
-    with st.expander("📋 Tabla de recomendaciones por docente", expanded=True):
-        mostrar_tabla_recomendaciones()
-
-
-def mostrar_tabla_recomendaciones():
-    """
-    Muestra una tabla con las columnas 'nombres_apellidos' y 'recomen_falencia'
-    a partir de los datos filtrados en session_state. Incluye botón de descarga CSV.
-    """
-    # Obtener los datos ya filtrados (desde el sidebar)
-    df = get_filtrado_data()
-
-    # Verificar que existan las columnas necesarias
-    columnas_requeridas = ["nombres_apellidos", "recomen_falencia"]
-    for col in columnas_requeridas:
-        if col not in df.columns:
-            st.error(f"❌ La columna '{col}' no existe en los datos filtrados.")
-            return
-
-    # Crear el DataFrame con solo esas dos columnas
-    df_tabla = df[columnas_requeridas].copy()
-
-    # Mostrar el título y cantidad de registros
-    st.subheader("📋 Tabla de Recomendaciones por Docente")
-
-    # ================================================================
-    # 📌 SELECTBOX PARA FILTRAR POR DOCENTE
-    # ================================================================
-    # Obtener lista de docentes únicos ordenados alfabéticamente
-    docentes_disponibles = sorted(df_tabla["nombres_apellidos"].dropna().unique())
-
-    if len(docentes_disponibles) > 0:
-        # Crear dos columnas para el filtro
-        col_filtro1, col_filtro2 = st.columns([1, 3])
-
-        with col_filtro1:
-            # 🔽 AQUÍ ESTÁ EL SELECTBOX 🔽
-            opcion_docente = st.selectbox(
-                "👨‍🏫 Filtrar por docente:",
-                options=["Todos"] + docentes_disponibles,
-                key="filtro_docente_recomendaciones",
-            )
-            # 🔼 AQUÍ TERMINA EL SELECTBOX 🔼
-
-        # Aplicar filtro según lo seleccionado en el selectbox
-        if opcion_docente != "Todos":
-            # Filtrar el DataFrame para mostrar solo el docente seleccionado
-            df_tabla = df_tabla[df_tabla["nombres_apellidos"] == opcion_docente]
-            st.success(f"✅ Mostrando recomendaciones de: **{opcion_docente}**")
-        else:
-            st.info(f"📊 Mostrando todos los docentes ({len(df_tabla)} registros)")
-    else:
-        st.warning("⚠️ No hay docentes disponibles para filtrar.")
-
-    # ================================================================
-    # FIN DEL SELECTBOX
-    # ================================================================
-
-    # Mostrar la tabla interactiva con los datos filtrados
-    st.dataframe(
-        df_tabla,
-        column_config={
-            "nombres_apellidos": "Docente",
-            "recomen_falencia": "Recomendación",
-        },
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    # Botón para descargar CSV (para imprimir o guardar)
-    csv = df_tabla.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="📥 Descargar CSV (para imprimir)",
-        data=csv,
-        file_name="recomendaciones_docentes.csv",
-        mime="text/csv",
-        help="Descarga el archivo CSV que puedes abrir en Excel o imprimir.",
-    )
-
-
-# ================================================================
-# EJECUCIÓN
-# ================================================================
 
 if __name__ == "__main__":
     main()
